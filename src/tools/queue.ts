@@ -135,7 +135,8 @@ export class GetQueueTool implements MCPTool {
   public readonly description = 'Get the current Spotify playback queue';
   
   public readonly inputSchema = z.object({
-    limit: z.number().min(1).max(50).default(20).describe('Number of queue items to return (1-50)'),
+    limit: z.union([z.number(), z.string().transform(val => parseInt(val, 10))])
+      .pipe(z.number().min(1).max(50)).default(20).describe('Number of queue items to return (1-50)'),
   }).describe('Queue retrieval options');
 
   constructor(private spotifyClient: ISpotifyClient) {}
@@ -420,7 +421,10 @@ export class ClearQueueTool implements MCPTool {
   
   public readonly inputSchema = z.object({
     deviceId: z.string().optional().describe('Specific device ID to clear queue on'),
-    keepCurrent: z.boolean().default(true).describe('Whether to keep currently playing track'),
+    keepCurrent: z.union([
+      z.boolean(),
+      z.string().transform(val => val === 'true')
+    ]).default(true).describe('Whether to keep currently playing track'),
   }).describe('Queue clearing options');
 
   constructor(private spotifyClient: ISpotifyClient) {}

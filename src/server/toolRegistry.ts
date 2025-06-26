@@ -88,14 +88,70 @@ export class ToolRegistry {
       return schema;
     }
     
-    // If it's a Zod schema, create a basic JSON Schema
+    // If it's a Zod schema, parse its shape
     if (schemaObj._def) {
-      return {
+      const zodDef = schemaObj._def as any;
+      const result: any = {
         type: 'object',
         properties: {},
-        additionalProperties: true,
-        description: schemaObj.description || 'Tool input parameters'
+        required: []
       };
+      
+      // Handle ZodObject shape
+      if (zodDef.typeName === 'ZodObject' && zodDef.shape) {
+        const shape = zodDef.shape();
+        for (const [key, value] of Object.entries(shape)) {
+          const fieldDef = (value as any)._def;
+          
+          // Determine the JSON Schema type
+          let fieldSchema: any = { type: 'string' }; // default
+          
+          if (fieldDef.typeName === 'ZodString') {
+            fieldSchema = { type: 'string' };
+          } else if (fieldDef.typeName === 'ZodNumber') {
+            fieldSchema = { type: 'number' };
+          } else if (fieldDef.typeName === 'ZodBoolean') {
+            fieldSchema = { type: 'boolean' };
+          } else if (fieldDef.typeName === 'ZodArray') {
+            fieldSchema = { type: 'array', items: { type: 'string' } };
+          } else if (fieldDef.typeName === 'ZodEnum') {
+            fieldSchema = { type: 'string', enum: fieldDef.values };
+          } else if (fieldDef.typeName === 'ZodOptional') {
+            // Handle optional fields
+            const innerDef = fieldDef.innerType._def;
+            if (innerDef.typeName === 'ZodString') {
+              fieldSchema = { type: 'string' };
+            } else if (innerDef.typeName === 'ZodNumber') {
+              fieldSchema = { type: 'number' };
+            } else if (innerDef.typeName === 'ZodBoolean') {
+              fieldSchema = { type: 'boolean' };
+            } else if (innerDef.typeName === 'ZodArray') {
+              fieldSchema = { type: 'array', items: { type: 'string' } };
+            } else if (innerDef.typeName === 'ZodEnum') {
+              fieldSchema = { type: 'string', enum: innerDef.values };
+            }
+          }
+          
+          // Add description if available
+          if (fieldDef.description) {
+            fieldSchema.description = fieldDef.description;
+          }
+          
+          result.properties[key] = fieldSchema;
+          
+          // Mark as required if not optional
+          if (fieldDef.typeName !== 'ZodOptional') {
+            result.required.push(key);
+          }
+        }
+      }
+      
+      // Add schema description if available
+      if (zodDef.description) {
+        result.description = zodDef.description;
+      }
+      
+      return result;
     }
     
     // Default fallback

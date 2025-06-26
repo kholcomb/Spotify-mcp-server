@@ -27,10 +27,9 @@ export class SimpleLogger implements Logger {
       ...data,
     };
 
-    // Using console for structured logging in Node.js environment
+    // MCP servers must only use stderr for logging - stdout is reserved for protocol messages
     // eslint-disable-next-line no-console
-    const output = level === 'error' ? console.error : console.log;
-    output(JSON.stringify(logEntry));
+    console.error(JSON.stringify(logEntry));
   }
 
   debug(message: string, data?: Record<string, unknown>): void {

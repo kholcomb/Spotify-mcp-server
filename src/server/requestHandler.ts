@@ -51,7 +51,7 @@ export class RequestHandler {
       }
       
       // Create tool context (not used in current implementation but available for extensions)
-      const _context = await this.createToolContext();
+      const _context = await this.createToolContext(toolName);
       
       // Validate input if tool has Zod schema
       let validatedInput = args;
@@ -154,11 +154,11 @@ export class RequestHandler {
   /**
    * Create tool execution context
    */
-  private async createToolContext(): Promise<ToolContext> {
+  private async createToolContext(toolName?: string): Promise<ToolContext> {
     // Check authentication status
     const authStatus = await this.authService.getAuthStatus();
     
-    if (!authStatus.authenticated && !this.isAuthExemptTool()) {
+    if (!authStatus.authenticated && !this.isAuthExemptTool(toolName)) {
       throw new Error('Authentication required. Please authenticate with Spotify first.');
     }
     
@@ -175,11 +175,10 @@ export class RequestHandler {
   /**
    * Check if current tool is exempt from authentication
    */
-  private isAuthExemptTool(): boolean {
+  private isAuthExemptTool(toolName?: string): boolean {
     // Tools that don't require authentication
-    const _exemptTools = ['health_check', 'authenticate'];
-    // This will be updated when we know the actual tool being executed
-    return false;
+    const exemptTools = ['health_check', 'authenticate', 'get_auth_status'];
+    return toolName ? exemptTools.includes(toolName) : false;
   }
   
   /**

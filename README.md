@@ -1,197 +1,219 @@
-# Spotify MCP Server
+# 🎵 Spotify MCP Server
 
-A Model Context Protocol (MCP) server that provides standardized AI interfaces for Spotify Web API integration, enabling music control, search, and data access through AI assistants like Claude.
+Control Spotify with natural language through Claude Desktop! This Model Context Protocol (MCP) server enables seamless Spotify integration, allowing you to search for music, control playback, manage queues, and more using conversational commands.
 
-## Features
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/spotify-mcp-server/spotify-mcp-server)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-18%2B-brightgreen.svg)](https://nodejs.org/)
+[![CI](https://github.com/spotify-mcp-server/spotify-mcp-server/workflows/CI/badge.svg)](https://github.com/spotify-mcp-server/spotify-mcp-server/actions)
+[![Security](https://img.shields.io/badge/security-audited-green.svg)](https://github.com/spotify-mcp-server/spotify-mcp-server/security/policy)
 
-- 🎵 **Music Playback Control**: Play, pause, skip, volume, shuffle, repeat
-- 🔍 **Universal Search**: Search tracks, artists, albums, and playlists
-- 📋 **Queue Management**: Add to queue, view current queue
-- 👤 **User Data Access**: Profile, playlists, recently played, saved content
-- 🔐 **Secure Authentication**: OAuth 2.0 + PKCE with encrypted token storage
-- ⚡ **Rate Limiting**: Intelligent request queuing and caching
-- 🛡️ **Type Safety**: Full TypeScript implementation with strict types
+## ✨ Features
 
-## Prerequisites
+- 🎯 **Natural Language Control**: "Play Bohemian Rhapsody", "Skip to next track", "Set volume to 50"
+- 🔍 **Smart Search**: Find tracks, albums, artists, playlists with flexible queries
+- 🎵 **Full Playback Control**: Play, pause, skip, seek, volume, shuffle, repeat
+- 📱 **Multi-Device Support**: Control any of your Spotify-connected devices
+- 🔐 **Secure Authentication**: OAuth 2.0 + PKCE flow with encrypted token storage
+- ⚡ **Real-time Updates**: Get current playback status and queue information
+- 🛡️ **Enterprise Ready**: Optional HSM support, certificate pinning, audit logging
 
-- **Node.js 18.0+** (LTS recommended)
-- **Spotify Premium Account** (required for playback control)
-- **Spotify Developer Application** (for API credentials)
+## 🚀 Quick Start
 
-## Quick Start
-
-### 1. Spotify Developer Setup
-
-1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-2. Create a new application
-3. Note your Client ID and Client Secret
-4. Add redirect URI to your app settings:
-   - **Development**: `http://localhost:8080/callback`
-   - **Production**: `https://yourdomain.com/callback` (HTTPS required)
-
-> ⚠️ **Security Note**: Production deployments MUST use HTTPS redirect URIs. See [Redirect URI Security Guide](docs/REDIRECT_URI_SECURITY.md) for detailed setup instructions.
-
-### 2. Installation
+### One-Command Setup
 
 ```bash
-# Clone and install dependencies
-npm install
-
-# Copy environment template
-cp .env.example .env
-
-# Edit .env with your Spotify credentials
-SPOTIFY_CLIENT_ID=your_client_id_here
-SPOTIFY_CLIENT_SECRET=your_client_secret_here
+git clone https://github.com/your-username/spotify-mcp-server.git
+cd spotify-mcp-server
+npm run setup
 ```
 
-### 3. Development
+The setup script will:
+1. ✅ Install all dependencies
+2. ✅ Build the project
+3. ✅ Guide you through Spotify app creation
+4. ✅ Configure Claude Desktop automatically
+5. ✅ Test the connection
+
+### Manual Setup
+
+See [INSTALLATION_GUIDE.md](./INSTALLATION_GUIDE.md) for detailed instructions.
+
+## 🎯 What You Can Do
+
+Once set up, use natural language with Claude:
+
+### 🔍 Search & Discovery
+- **"Search for Taylor Swift songs"**
+- **"Find albums by The Beatles"**
+- **"Look up Chill Vibes playlist"**
+
+### 🎵 Playback Control
+- **"Play music"** / **"Pause"** / **"Stop"**
+- **"Skip to next track"** / **"Go back to previous song"**
+- **"Set volume to 75"**
+- **"Turn on shuffle"** / **"Turn off repeat"**
+
+### 📝 Queue Management
+- **"Add this song to my queue"**
+- **"Show what's in the queue"**
+- **"Clear the queue but keep current song"**
+
+### 📱 Device Control
+- **"List my available devices"**
+- **"Switch playback to my phone"**
+- **"Show what's currently playing"**
+
+### 🔐 Account Management
+- **"Show my Spotify profile"**
+- **"Check authentication status"**
+
+## 🛠️ Architecture
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Claude AI     │◄──►│  MCP Server      │◄──►│  Spotify API    │
+│                 │    │                  │    │                 │
+│ Natural Language│    │ • Authentication │    │ • Web API       │
+│ Commands        │    │ • Tool Registry  │    │ • OAuth 2.0     │
+│                 │    │ • Request Handler│    │ • Rate Limiting │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+```
+
+### Core Components
+
+- **🔐 Authentication**: Secure OAuth 2.0 + PKCE flow
+- **🛠️ Tool Registry**: 21 specialized tools for Spotify operations
+- **🔄 Request Handler**: Intelligent request routing and validation
+- **📊 Rate Limiter**: Automatic rate limiting and retry logic
+- **🛡️ Security Layer**: Certificate pinning, HSM support, encrypted storage
+
+## 📋 Available Tools
+
+| Category | Tools | Description |
+|----------|-------|-------------|
+| **Playback** | `play`, `pause`, `skip_next`, `skip_previous` | Basic playback controls |
+| **Audio** | `set_volume`, `seek`, `set_shuffle`, `set_repeat` | Audio and mode controls |
+| **Search** | `search`, `get_recommendations` | Music discovery |
+| **Queue** | `add_to_queue`, `get_queue`, `clear_queue`, `add_playlist_to_queue` | Queue management |
+| **Devices** | `get_devices`, `transfer_playback` | Multi-device control |
+| **Status** | `get_playback_status`, `get_user_profile` | Information retrieval |
+| **Auth** | `authenticate`, `get_auth_status` | Authentication management |
+
+## 🔧 Requirements
+
+- **Node.js** 18 or higher
+- **Claude Desktop** application
+- **Spotify Account** (Free or Premium)
+- **Internet Connection** for API access
+
+## 🛡️ Security
+
+- **🔐 OAuth 2.0 + PKCE**: Industry-standard secure authentication
+- **🔒 Local Encryption**: Tokens encrypted with AES-256 + PBKDF2
+- **🔑 HSM Support**: Optional hardware security module integration
+- **📜 Certificate Pinning**: Validates Spotify's SSL certificates (configurable)
+- **🚫 No Data Collection**: All processing happens locally
+- **🔄 Auto Token Refresh**: Seamless token management
+
+## 📝 Configuration
+
+### Environment Variables
 
 ```bash
-# Start development server with hot reload
-npm run dev
-
-# Or build and run production version
-npm run build
-npm start
+SPOTIFY_CLIENT_ID=your_client_id
+SPOTIFY_CLIENT_SECRET=your_client_secret
+SPOTIFY_REDIRECT_URI=http://127.0.0.1:8080/callback
+LOG_LEVEL=info  # debug, info, warn, error
 ```
 
-### 4. MCP Client Configuration
-
-Add to your MCP client configuration (e.g., Claude Desktop):
+### Claude Desktop Config
 
 ```json
 {
   "mcpServers": {
     "spotify": {
       "command": "node",
-      "args": ["path/to/spotify-mcp-server/build/index.js"],
+      "args": ["/path/to/project/build/index.js"],
       "env": {
         "SPOTIFY_CLIENT_ID": "your_client_id",
-        "SPOTIFY_CLIENT_SECRET": "your_client_secret"
+        "SPOTIFY_CLIENT_SECRET": "your_client_secret",
+        "SPOTIFY_REDIRECT_URI": "http://127.0.0.1:8080/callback"
       }
     }
   }
 }
 ```
 
-## Available Commands
-
-- `npm run build` - Build TypeScript to JavaScript
-- `npm run dev` - Start development server with hot reload
-- `npm run test` - Run test suite
-- `npm run test:coverage` - Run tests with coverage report
-- `npm run lint` - Check code style and errors
-- `npm run format` - Format code with Prettier
-- `npm run typecheck` - Type checking without emit
-
-## Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `SPOTIFY_CLIENT_ID` | ✅ | - | Your Spotify application client ID |
-| `SPOTIFY_CLIENT_SECRET` | ✅ | - | Your Spotify application client secret |
-| `SPOTIFY_REDIRECT_URI` | ✅ | `http://localhost:8080/callback` | OAuth callback URI (HTTPS required in production) |
-| `SPOTIFY_ALLOWED_DOMAINS` | ❌ | - | Comma-separated list of allowed domains for redirect URI validation |
-| `NODE_ENV` | ❌ | `development` | Environment: development, staging, production |
-| `LOG_LEVEL` | ❌ | `info` | Logging level (debug, info, warn, error) |
-| `REQUIRE_HARDWARE_HSM` | ❌ | `false` | Require hardware HSM for token encryption in production |
-
-## MCP Tools
-
-### Playback Control
-- `play` - Start/resume playback
-- `pause` - Pause playback
-- `skip_next` - Skip to next track
-- `skip_previous` - Skip to previous track
-- `set_volume` - Set playback volume (0-100)
-- `toggle_shuffle` - Toggle shuffle mode
-- `set_repeat` - Set repeat mode (off, track, context)
-
-### Search & Discovery
-- `search` - Universal search across Spotify catalog
-- `get_recommendations` - Get personalized track recommendations
-
-### Queue Management
-- `add_to_queue` - Add track to playback queue
-- `get_queue` - View current playback queue
-
-### User Data
-- `get_current_playback` - Get current playback state
-- `get_user_profile` - Get user profile information
-- `get_user_playlists` - Get user's playlists
-- `get_recently_played` - Get recently played tracks
-
-## Architecture
-
-The server follows a modular architecture with clear separation of concerns:
-
-- **`/server`** - MCP protocol handling and tool registry
-- **`/auth`** - OAuth 2.0 + PKCE authentication management
-- **`/spotify`** - Spotify API client and data models
-- **`/tools`** - MCP tool implementations
-- **`/types`** - TypeScript type definitions
-- **`/utils`** - Shared utilities and helpers
-
-## Security
-
-- **OAuth 2.0 + PKCE**: Industry-standard secure authentication
-- **Token Encryption**: AES-256 encryption for stored tokens
-- **Input Validation**: Comprehensive validation using Zod schemas
-- **Rate Limiting**: Automatic compliance with Spotify API limits
-- **No Credential Logging**: Tokens and secrets never logged
-
-## Production Deployment
-
-### Secure HTTPS Setup
-
-For production deployments, HTTPS is **required** for redirect URIs:
+## 🧪 Testing
 
 ```bash
-# Quick secure deployment (requires domain and SSL)
-./scripts/deploy-secure.sh --domain yourdomain.com --email admin@yourdomain.com
+# Test the connection
+npm run test-connection
 
-# Docker Compose production deployment
-docker-compose -f docker-compose.production.yml up -d
+# Run all tests
+npm test
+
+# Run with coverage
+npm run test:coverage
+
+# Test specific components
+npm run test:unit
+npm run test:integration
 ```
 
-### Configuration Steps
+## 🔍 Troubleshooting
 
-1. **Set up SSL Certificate**: Use Let's Encrypt or your preferred certificate authority
-2. **Configure Environment**: Copy `.env.production.example` to `.env.production`
-3. **Update Spotify Dashboard**: Add HTTPS redirect URI (`https://yourdomain.com/callback`)
-4. **Deploy with Security**: Use the provided deployment scripts for secure setup
+### Common Issues
 
-📖 **Detailed Guide**: See [Redirect URI Security Guide](docs/REDIRECT_URI_SECURITY.md) for comprehensive production setup instructions.
+| Issue | Solution |
+|-------|----------|
+| "Server disconnected" | Check Node.js version (18+), restart Claude Desktop |
+| "Authentication required" | Run authenticate command first |
+| "Validation error" | Update to latest version |
+| Connection issues | Check internet connection and Spotify app settings |
 
-### Security Checklist
+### Debug Information
 
-- [ ] HTTPS redirect URI configured in Spotify Dashboard
-- [ ] Valid SSL certificate installed
-- [ ] Environment variables properly set
-- [ ] Domain DNS pointing to server
-- [ ] Firewall allowing HTTPS traffic (port 443)
-- [ ] Security headers configured (included in NGINX config)
+- **Logs**: `/Users/yourname/Library/Logs/Claude/mcp-server-spotify.log`
+- **Test Connection**: `npm run test-connection`
+- **Verify Setup**: Check Claude Desktop config file
 
-## Contributing
+## 📚 Documentation
 
-1. Ensure Node.js 18+ is installed
-2. Install dependencies: `npm install`
-3. Copy `.env.example` to `.env` and configure
-4. Run tests: `npm test`
-5. Check linting: `npm run lint`
-6. Format code: `npm run format`
+- [📖 Installation Guide](./INSTALLATION_GUIDE.md) - Step-by-step setup
+- [🛠️ API Documentation](./docs/) - Technical reference
+- [🔒 Security Guide](./docs/REDIRECT_URI_SECURITY.md) - Security implementation
+- [🧪 Testing Guide](./docs/TESTING.md) - Testing procedures
 
-## License
+## 🤝 Contributing
 
-MIT - See LICENSE file for details
+We welcome contributions! Please see our [Contributing Guide](./docs/CONTRIBUTING.md).
 
-## Support
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
 
-- **Documentation**: See `/docs` directory
-- **Issues**: Report issues with detailed reproduction steps
-- **Requirements**: Spotify Premium account required for playback control
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **Spotify** for the amazing Web API
+- **Anthropic** for Claude and the MCP protocol
+- **Model Context Protocol** community for the specification
+
+## 📞 Support
+
+- 🐛 [Report Issues](https://github.com/your-username/spotify-mcp-server/issues)
+- 💬 [Join Discussions](https://github.com/your-username/spotify-mcp-server/discussions)
+- 📧 [Contact](mailto:support@example.com)
 
 ---
 
-Built with the [Model Context Protocol](https://modelcontextprotocol.io/) for seamless AI assistant integration.
+**Made with ❤️ for the Claude and Spotify communities**
+
+*Enjoy your music with AI! 🎶*

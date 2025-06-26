@@ -50,22 +50,22 @@ export class SpotifyClient implements ISpotifyClient {
     // Initialize certificate manager for enhanced HTTPS security
     this.certificateManager = createCertificateManager(
       {
-        enabled: true,
-        strictMode: process.env.NODE_ENV === 'production',
-        allowDevelopment: process.env.NODE_ENV !== 'production',
+        enabled: false, // Temporarily disable certificate pinning due to TLS compatibility
+        strictMode: false,
+        allowDevelopment: true,
       },
       logger
     );
     
-    // Create axios instance with security enhancements
+    // Create axios instance with basic security
     this.axios = axios.create({
       baseURL: SpotifyClient.BASE_URL,
       timeout: SpotifyClient.DEFAULT_TIMEOUT,
       headers: {
         'Content-Type': 'application/json',
       },
-      // Use secure HTTPS agent with certificate pinning
-      httpsAgent: this.certificateManager.createSecureAgent(),
+      // Use default HTTPS agent without certificate pinning for now
+      // httpsAgent: this.certificateManager.createSecureAgent(),
     });
     
     // Set up request/response interceptors

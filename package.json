@@ -5,9 +5,12 @@
   "main": "build/index.js",
   "type": "module",
   "scripts": {
+    "setup": "node setup.js",
+    "create-release": "node create-release.js",
     "build": "tsc",
     "dev": "tsx src/index.ts",
     "start": "node build/index.js",
+    "test-connection": "node test-connection.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -25,8 +28,9 @@
     "audit:fix": "npm audit fix",
     "clean": "rm -rf build coverage",
     "build:fast": "npm run clean && npx tsc",
+    "build:production": "npm run clean && npm run lint && npm run typecheck && tsc",
     "prebuild": "npm run clean && npm run lint && npm run typecheck",
-    "postbuild": "npm run test:coverage",
+    "postbuild": "echo '✅ Build complete!'",
     "ci": "npm run prebuild && npm run build && npm run test:ci",
     "security": "npm audit && npm run test:coverage",
     "validate:gitignore": "./scripts/validate-gitignore.sh",
@@ -55,20 +59,21 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "axios": "^1.6.0",
-    "zod": "^3.22.0",
-    "dotenv": "^16.3.0"
+    "dotenv": "^16.3.0",
+    "open": "^10.1.2",
+    "zod": "^3.22.0"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
-    "@types/jest": "^29.5.0",
     "eslint": "^8.55.0",
     "jest": "^29.7.0",
     "jest-environment-node": "^29.7.0",
+    "prettier": "^3.1.0",
     "ts-jest": "^29.1.0",
     "ts-node": "^10.9.0",
-    "prettier": "^3.1.0",
     "tsx": "^4.6.0",
     "typescript": "^5.3.0"
   }

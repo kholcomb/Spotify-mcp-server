@@ -270,35 +270,33 @@ export class AuthenticateTool implements MCPTool {
   public readonly name = 'authenticate';
   public readonly description = 'Start Spotify authentication flow';
   
-  public readonly inputSchema = z.object({
-    userId: z.string().min(1).describe('User identifier for this session'),
-    forceReauth: z.boolean().default(false).describe('Force re-authentication even if already authenticated'),
-  }).describe('Authentication parameters');
+  public readonly inputSchema = z.object({}).describe('No parameters required');
 
   constructor(private authService: IAuthService) {}
 
   async execute(input: unknown): Promise<ToolResult> {
     try {
-      const params = this.inputSchema.parse(input);
+      this.inputSchema.parse(input);
       
-      // Check if already authenticated (unless forcing re-auth)
-      if (!params.forceReauth) {
-        const isAuthenticated = await this.authService.isAuthenticated(params.userId);
-        if (isAuthenticated) {
-          const _authStatus = await this.authService.getAuthStatus(params.userId);
-          return {
-            success: true,
-            data: {
-              message: 'Already authenticated',
-              status: 'authenticated',
-              user_id: params.userId,
-            },
-          };
-        }
+      // Use a default user ID for the session
+      const userId = 'default';
+      
+      // Check if already authenticated
+      const isAuthenticated = await this.authService.isAuthenticated(userId);
+      if (isAuthenticated) {
+        const _authStatus = await this.authService.getAuthStatus(userId);
+        return {
+          success: true,
+          data: {
+            message: 'Already authenticated',
+            status: 'authenticated',
+            user_id: userId,
+          },
+        };
       }
 
       // Start authentication flow
-      const authResult = await this.authService.startAuthFlow(params.userId);
+      const authResult = await this.authService.startAuthFlow(userId);
       
       return {
         success: true,
@@ -343,36 +341,36 @@ export class GetAuthStatusTool implements MCPTool {
   public readonly name = 'get_auth_status';
   public readonly description = 'Check current authentication status';
   
-  public readonly inputSchema = z.object({
-    userId: z.string().min(1).describe('User identifier to check authentication for'),
-  }).describe('Authentication status parameters');
+  public readonly inputSchema = z.object({}).describe('No parameters required');
 
   constructor(private authService: IAuthService) {}
 
   async execute(input: unknown): Promise<ToolResult> {
     try {
-      const params = this.inputSchema.parse(input);
+      this.inputSchema.parse(input);
       
-      const isAuthenticated = await this.authService.isAuthenticated(params.userId);
+      // Use default user ID
+      const userId = 'default';
+      const isAuthenticated = await this.authService.isAuthenticated(userId);
       
       if (!isAuthenticated) {
         return {
           success: true,
           data: {
             authenticated: false,
-            user_id: params.userId,
+            user_id: userId,
             message: 'Not authenticated. Use the authenticate tool to start the auth flow.',
           },
         };
       }
 
-      const _authStatus = await this.authService.getAuthStatus(params.userId);
+      const _authStatus = await this.authService.getAuthStatus(userId);
       
       return {
         success: true,
         data: {
           authenticated: true,
-          user_id: params.userId,
+          user_id: userId,
         },
       };
     } catch (error) {

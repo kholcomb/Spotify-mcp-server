@@ -19,13 +19,19 @@ export class SearchTool implements MCPTool {
   
   public readonly inputSchema = z.object({
     query: z.string().min(1).describe('Search query string'),
-    types: z.array(z.enum(['track', 'album', 'artist', 'playlist', 'show', 'episode']))
-      .default(['track'])
-      .describe('Types of items to search for'),
+    types: z.union([
+      z.array(z.enum(['track', 'album', 'artist', 'playlist', 'show', 'episode'])),
+      z.string().transform(val => [val as 'track' | 'album' | 'artist' | 'playlist' | 'show' | 'episode'])
+    ]).default(['track']).describe('Types of items to search for'),
     market: z.string().length(2).optional().describe('ISO 3166-1 alpha-2 country code (e.g., "US")'),
-    limit: z.number().min(1).max(50).default(20).describe('Number of results to return (1-50)'),
-    offset: z.number().min(0).default(0).describe('Offset for pagination'),
-    includeExternal: z.boolean().default(false).describe('Include externally hosted audio content'),
+    limit: z.union([z.number(), z.string().transform(val => parseInt(val, 10))])
+      .pipe(z.number().min(1).max(50)).default(20).describe('Number of results to return (1-50)'),
+    offset: z.union([z.number(), z.string().transform(val => parseInt(val, 10))])
+      .pipe(z.number().min(0)).default(0).describe('Offset for pagination'),
+    includeExternal: z.union([
+      z.boolean(),
+      z.string().transform(val => val === 'true' || val === 'audio')
+    ]).default(false).describe('Include externally hosted audio content'),
   }).describe('Search parameters');
 
   constructor(private spotifyClient: ISpotifyClient) {}
