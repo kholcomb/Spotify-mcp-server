@@ -264,3 +264,6 @@ config.local.*
 deploy-temp/
 build-temp/
 release-temp/
+
+# GitHub workflows (to avoid permission issues)
+.github/workflows/ci.yml
