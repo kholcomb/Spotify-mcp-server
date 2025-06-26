@@ -1,42 +1,116 @@
+# Spotify MCP Server - Git Ignore Rules
+# 
+# This file prevents sensitive data, build artifacts, and environment-specific
+# files from being committed to version control. 
+#
+# SECURITY WARNING: Never commit:
+# - API keys, secrets, or tokens (.env files)
+# - SSL/TLS certificates and private keys
+# - Authentication tokens or session data
+# - Production configuration files
+# - Database files with user data
+#
+# Last updated: 2025-06-26
+
 # Dependencies
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # Build output
 build/
 dist/
+*.tsbuildinfo
 
-# Environment variables
+# Environment variables and configuration
 .env
 .env.local
+.env.development
+.env.staging
 .env.production
+.env.test
+config.json
+config-*.json
 
-# Token storage (encrypted)
+# Security and authentication files
 tokens/
 *.token
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+.spotify-mcp/
+auth-tokens/
+certificates/
 
-# Logs
+# SSL/TLS certificates and keys
+ssl/
+certs/
+private/
+*.csr
+
+# Docker secrets and volumes
+docker-secrets/
+docker-volumes/
+.docker/
+
+# Kubernetes secrets
+k8s-secrets/
+*.yaml.secret
+*.yml.secret
+
+# Logs and monitoring
 logs/
 *.log
+*.log.*
+audit.log
+access.log
+error.log
+server.log
+
+# Test artifacts and coverage
+coverage/
+*.lcov
+test-results/
+junit.xml
+.nyc_output/
+jest-coverage/
 
 # Runtime data
 pids/
 *.pid
 *.seed
 *.pid.lock
+run/
+tmp/
+temp/
 
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
+# Cache directories
+.npm
+.yarn
+.pnpm
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.vuepress/dist
 
 # IDE and editor files
 .vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
 *~
+.sublime-*
+*.sublime-project
+*.sublime-workspace
 
 # OS generated files
 .DS_Store
@@ -46,15 +120,147 @@ coverage/
 .Trashes
 ehthumbs.db
 Thumbs.db
+Desktop.ini
 
-# TypeScript cache
-*.tsbuildinfo
+# Package manager files
+package-lock.json.backup
+yarn.lock.backup
+.pnpm-debug.log*
 
-# Optional npm cache directory
-.npm
-
-# ESLint cache
+# ESLint and Prettier cache
 .eslintcache
-
-# Prettier cache
 .prettiercache
+.stylelintcache
+
+# TypeScript
+*.tsbuildinfo
+.tscache
+
+# Jest
+.jest-cache/
+
+# Storybook
+.storybook-static/
+
+# Local development
+.local
+.temp
+.temporary
+
+# Backup files
+*.backup
+*.bak
+*.tmp
+*~
+.#*
+
+# Archive files
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.rar
+*.7z
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Error dumps
+*.dmp
+*.dump
+core.*
+
+# macOS specific
+.AppleDouble
+.LSOverride
+Icon
+.DocumentRevisions-V100
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux specific
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Production deployment files
+production-config/
+staging-config/
+deployment-secrets/
+.secrets/
+
+# Monitoring and observability
+metrics/
+traces/
+profiles/
+dumps/
+
+# Local testing and development
+test-data/
+mock-data/
+fixtures-local/
+dev-scripts/
+local-*/
+
+# Terraform (if used)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Helm charts secrets (if used)
+charts/secrets/
+helm-secrets/
+
+# AWS credentials (if used)
+.aws/credentials
+.aws/config
+
+# Google Cloud credentials (if used)
+gcloud-service-key.json
+.gcloud/
+
+# Azure credentials (if used)
+.azure/
+
+# Spotify MCP specific
+.spotify-mcp-data/
+spotify-tokens/
+mcp-cache/
+auth-state/
+session-data/
+
+# HSM and security module files
+hsm-data/
+security-keys/
+encrypted-storage/
+keystore/
+
+# Local override files
+docker-compose.override.yml
+docker-compose.local.yml
+.env.override
+config.local.*
+
+# Temporary files for deployment
+deploy-temp/
+build-temp/
+release-temp/
