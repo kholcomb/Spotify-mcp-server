@@ -21,6 +21,7 @@ import type { AuthService } from '../auth/index.js';
 import { RateLimiter } from './rateLimiter.js';
 import { SpotifyError, SpotifyRateLimitError, SpotifyAuthError } from './errors.js';
 import type { SpotifyRateLimitErrorDetails, SpotifyAuthErrorDetails, SpotifyErrorDetails } from './errors.js';
+import { CertificateManager, createCertificateManager } from '../security/index.js';
 
 /**
  * Spotify Web API client with rate limiting and error handling
@@ -33,6 +34,7 @@ export class SpotifyClient implements ISpotifyClient {
   private readonly authService: AuthService;
   private readonly logger: Logger;
   private readonly rateLimiter: RateLimiter;
+  private readonly certificateManager: CertificateManager;
   private userId: string = 'default';
   
   private static readonly BASE_URL = 'https://api.spotify.com/v1';
@@ -45,13 +47,25 @@ export class SpotifyClient implements ISpotifyClient {
     this.logger = logger;
     this.rateLimiter = new RateLimiter(logger);
     
-    // Create axios instance with defaults
+    // Initialize certificate manager for enhanced HTTPS security
+    this.certificateManager = createCertificateManager(
+      {
+        enabled: true,
+        strictMode: process.env.NODE_ENV === 'production',
+        allowDevelopment: process.env.NODE_ENV !== 'production',
+      },
+      logger
+    );
+    
+    // Create axios instance with security enhancements
     this.axios = axios.create({
       baseURL: SpotifyClient.BASE_URL,
       timeout: SpotifyClient.DEFAULT_TIMEOUT,
       headers: {
         'Content-Type': 'application/json',
       },
+      // Use secure HTTPS agent with certificate pinning
+      httpsAgent: this.certificateManager.createSecureAgent(),
     });
     
     // Set up request/response interceptors

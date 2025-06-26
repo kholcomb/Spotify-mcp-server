@@ -5,6 +5,7 @@ import { homedir } from 'os';
 import axios from 'axios';
 import { z } from 'zod';
 import type { Logger } from '../types/index.js';
+import { HSMManager, HSMConfigurations, createHSMManager, type HSMAuditEntry } from '../security/hsmManager.js';
 
 /**
  * OAuth 2.0 authentication manager with PKCE flow for Spotify API
@@ -20,6 +21,8 @@ export class AuthManager {
   private readonly tokenDir: string;
   private readonly encryptionKey: Buffer;
   private readonly salt: Buffer;
+  private readonly hsmManager: HSMManager;
+  private hsmEncryptionKeyId?: string;
   
   private static readonly SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
   private static readonly SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
@@ -45,7 +48,74 @@ export class AuthManager {
     this.salt = this.getOrCreateSalt();
     this.encryptionKey = this.deriveEncryptionKey(config.clientSecret, this.salt);
     
+    // Initialize HSM manager for enterprise-grade key management
+    this.hsmManager = createHSMManager(
+      HSMConfigurations.autoDetect(),
+      logger,
+      {
+        enableAuditLogging: true,
+        requireHardwareHSM: process.env.NODE_ENV === 'production' && process.env.REQUIRE_HARDWARE_HSM === 'true',
+      }
+    );
+    
     this.ensureTokenDirectory();
+    this.initializeHSM().catch(err => {
+      logger.warn('HSM initialization failed, falling back to software encryption', {
+        error: err.message,
+      });
+    });
+  }
+
+  /**
+   * Initialize HSM for enterprise-grade key management
+   */
+  private async initializeHSM(): Promise<void> {
+    try {
+      await this.hsmManager.initialize();
+      
+      // Create or retrieve HSM encryption key
+      const existingKeys = await this.hsmManager.listKeys();
+      const spotifyKey = existingKeys.find(key => 
+        key.attributes?.purpose === 'spotify-token-encryption'
+      );
+      
+      if (spotifyKey) {
+        this.hsmEncryptionKeyId = spotifyKey.keyId;
+        this.logger.info('Using existing HSM encryption key for token storage', {
+          keyId: spotifyKey.keyId,
+          created: spotifyKey.created,
+        });
+      } else {
+        this.hsmEncryptionKeyId = await this.hsmManager.createEncryptionKey('aes-256-gcm', {
+          purpose: 'spotify-token-encryption',
+          application: 'spotify-mcp-server',
+          rotationInterval: '90d',
+        });
+        this.logger.info('Created new HSM encryption key for token storage', {
+          keyId: this.hsmEncryptionKeyId,
+        });
+      }
+    } catch (error) {
+      this.logger.warn('HSM initialization failed, using software encryption', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        hsmProvider: this.hsmManager.getProviderInfo(),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get HSM audit log for security monitoring
+   */
+  getHSMAuditLog(limit?: number): HSMAuditEntry[] {
+    return this.hsmManager.getAuditLog(limit);
+  }
+
+  /**
+   * Check if HSM is available and hardware-based
+   */
+  isHardwareHSM(): boolean {
+    return this.hsmManager.isHardwareHSM();
   }
 
   /**
@@ -418,20 +488,73 @@ export class AuthManager {
     }
   }
 
-  private encrypt(data: string): string {
+  private async encrypt(data: string): Promise<string> {
+    // Try HSM encryption first if available
+    if (this.hsmEncryptionKeyId) {
+      try {
+        const plaintext = Buffer.from(data, 'utf8');
+        const encryptedBuffer = await this.hsmManager.encrypt(this.hsmEncryptionKeyId, plaintext);
+        // Use 'hsm:' prefix to indicate HSM encryption
+        return `hsm:${encryptedBuffer.toString('base64')}`;
+      } catch (error) {
+        this.logger.warn('HSM encryption failed, falling back to PBKDF2', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+    
+    // Fallback to PBKDF2-based encryption
     const iv = randomBytes(16);
     const cipher = createCipheriv('aes-256-cbc', this.encryptionKey, iv);
     let encrypted = cipher.update(data, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    return `${iv.toString('hex')}:${encrypted}`;
+    // Use 'pbkdf2:' prefix to indicate PBKDF2 encryption
+    return `pbkdf2:${iv.toString('hex')}:${encrypted}`;
   }
 
-  private decrypt(encryptedData: string): string {
+  private async decrypt(encryptedData: string): Promise<string> {
+    // Check if data is HSM encrypted
+    if (encryptedData.startsWith('hsm:')) {
+      if (!this.hsmEncryptionKeyId) {
+        throw new Error('HSM encrypted data found but HSM key not available');
+      }
+      
+      try {
+        const encryptedBase64 = encryptedData.substring(4); // Remove 'hsm:' prefix
+        const encryptedBuffer = Buffer.from(encryptedBase64, 'base64');
+        const decryptedBuffer = await this.hsmManager.decrypt(this.hsmEncryptionKeyId, encryptedBuffer);
+        return decryptedBuffer.toString('utf8');
+      } catch (error) {
+        this.logger.error('HSM decryption failed', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw new Error('Failed to decrypt HSM-encrypted data');
+      }
+    }
+    
+    // Handle PBKDF2 encrypted data (new format with prefix)
+    if (encryptedData.startsWith('pbkdf2:')) {
+      const parts = encryptedData.substring(7).split(':'); // Remove 'pbkdf2:' prefix
+      if (parts.length !== 2 || !parts[0] || !parts[1]) {
+        throw new Error('Invalid PBKDF2 encrypted data format');
+      }
+      
+      const ivHex = parts[0];
+      const encrypted = parts[1];
+      const iv = Buffer.from(ivHex, 'hex');
+      const decipher = createDecipheriv('aes-256-cbc', this.encryptionKey, iv);
+      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      return decrypted;
+    }
+    
+    // Handle legacy format (no prefix - assume PBKDF2)
     const parts = encryptedData.split(':');
     if (parts.length !== 2 || !parts[0] || !parts[1]) {
       throw new Error('Invalid encrypted data format');
     }
     
+    this.logger.debug('Decrypting legacy format data, consider re-encrypting');
     const ivHex = parts[0];
     const encrypted = parts[1];
     const iv = Buffer.from(ivHex, 'hex');
@@ -443,7 +566,7 @@ export class AuthManager {
 
   private async storeTokens(userId: string, tokens: AuthTokens): Promise<void> {
     const tokenFile = join(this.tokenDir, `${userId}.tokens`);
-    const encryptedData = this.encrypt(JSON.stringify(tokens));
+    const encryptedData = await this.encrypt(JSON.stringify(tokens));
     writeFileSync(tokenFile, encryptedData, { mode: 0o600 });
   }
 
@@ -456,7 +579,7 @@ export class AuthManager {
     
     try {
       const encryptedData = readFileSync(tokenFile, 'utf8');
-      const decryptedData = this.decrypt(encryptedData);
+      const decryptedData = await this.decrypt(encryptedData);
       const tokens = JSON.parse(decryptedData);
       
       // Parse dates
@@ -483,7 +606,7 @@ export class AuthManager {
 
   private async storePKCEData(userId: string, data: PKCEData): Promise<void> {
     const pkceFile = join(this.tokenDir, `${userId}.pkce`);
-    const encryptedData = this.encrypt(JSON.stringify(data));
+    const encryptedData = await this.encrypt(JSON.stringify(data));
     writeFileSync(pkceFile, encryptedData, { mode: 0o600 });
   }
 
@@ -496,7 +619,7 @@ export class AuthManager {
     
     try {
       const encryptedData = readFileSync(pkceFile, 'utf8');
-      const decryptedData = this.decrypt(encryptedData);
+      const decryptedData = await this.decrypt(encryptedData);
       return JSON.parse(decryptedData);
     } catch (error) {
       this.logger.error('Failed to decrypt PKCE data', {
