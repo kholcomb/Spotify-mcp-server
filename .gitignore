@@ -263,4 +263,5 @@ config.local.*
 # Temporary files for deployment
 deploy-temp/
 build-temp/
-release-temp/
+release-temp/# GitHub workflows (to avoid permission issues)
+.github/workflows/ci.yml
