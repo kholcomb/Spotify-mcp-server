@@ -15,7 +15,13 @@ import type {
   DevicesResponse,
   RecommendationsResponse,
   PlaylistTracksResponse,
-  AlbumTracksResponse
+  AlbumTracksResponse,
+  TopTracksResponse,
+  TopArtistsResponse,
+  AudioFeaturesResponse,
+  SavedTracksResponse,
+  SavedAlbumsResponse,
+  FollowedArtistsResponse
 } from '../types/index.js';
 import type { AuthService } from '../auth/index.js';
 import { RateLimiter } from './rateLimiter.js';
@@ -361,6 +367,127 @@ export class SpotifyClient implements ISpotifyClient {
       method: 'GET',
       url: `/albums/${albumId}/tracks`,
       params: options,
+    });
+    
+    return response;
+  }
+
+  /**
+   * Get user's top tracks
+   */
+  async getUserTopTracks(options?: {
+    timeRange?: 'short_term' | 'medium_term' | 'long_term';
+    limit?: number;
+    offset?: number;
+  }): Promise<TopTracksResponse> {
+    const response = await this.request<TopTracksResponse>({
+      method: 'GET',
+      url: '/me/top/tracks',
+      params: {
+        time_range: options?.timeRange || 'medium_term',
+        limit: options?.limit || 20,
+        offset: options?.offset || 0,
+      },
+    });
+    
+    return response;
+  }
+
+  /**
+   * Get user's top artists
+   */
+  async getUserTopArtists(options?: {
+    timeRange?: 'short_term' | 'medium_term' | 'long_term';
+    limit?: number;
+    offset?: number;
+  }): Promise<TopArtistsResponse> {
+    const response = await this.request<TopArtistsResponse>({
+      method: 'GET',
+      url: '/me/top/artists',
+      params: {
+        time_range: options?.timeRange || 'medium_term',
+        limit: options?.limit || 20,
+        offset: options?.offset || 0,
+      },
+    });
+    
+    return response;
+  }
+
+  /**
+   * Get audio features for tracks
+   */
+  async getAudioFeatures(trackIds: string[]): Promise<AudioFeaturesResponse> {
+    if (trackIds.length === 0) {
+      throw new SpotifyError('At least one track ID is required', {
+        code: 'INVALID_REQUEST',
+      });
+    }
+
+    if (trackIds.length > 100) {
+      throw new SpotifyError('Maximum 100 track IDs allowed per request', {
+        code: 'INVALID_REQUEST',
+      });
+    }
+
+    const response = await this.request<AudioFeaturesResponse>({
+      method: 'GET',
+      url: '/audio-features',
+      params: {
+        ids: trackIds.join(','),
+      },
+    });
+    
+    return response;
+  }
+
+  /**
+   * Get user's saved tracks
+   */
+  async getUserSavedTracks(options?: PaginationOptions): Promise<SavedTracksResponse> {
+    const response = await this.request<SavedTracksResponse>({
+      method: 'GET',
+      url: '/me/tracks',
+      params: {
+        limit: options?.limit || 20,
+        offset: options?.offset || 0,
+      },
+    });
+    
+    return response;
+  }
+
+  /**
+   * Get user's saved albums
+   */
+  async getUserSavedAlbums(options?: PaginationOptions): Promise<SavedAlbumsResponse> {
+    const response = await this.request<SavedAlbumsResponse>({
+      method: 'GET',
+      url: '/me/albums',
+      params: {
+        limit: options?.limit || 20,
+        offset: options?.offset || 0,
+      },
+    });
+    
+    return response;
+  }
+
+  /**
+   * Get user's followed artists
+   */
+  async getUserFollowedArtists(options?: {
+    after?: string;
+    limit?: number;
+  }): Promise<FollowedArtistsResponse> {
+    const response = await this.request<FollowedArtistsResponse>({
+      method: 'GET',
+      url: '/me/following',
+      params: {
+        type: 'artist',
+        after: options?.after,
+        limit: options?.limit || 20,
+      },
     });
     
     return response;

@@ -38,6 +38,8 @@ export class AuthManager {
     'playlist-read-private',
     'playlist-read-collaborative',
     'user-library-read',
+    'user-top-read',
+    'user-follow-read',
     'streaming'
   ].join(' ');
 

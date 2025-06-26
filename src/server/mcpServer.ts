@@ -15,6 +15,7 @@ import {
   createSearchTools,
   createQueueTools,
   createStatusTools,
+  createInsightsTools,
 } from '../tools/index.js';
 
 /**
@@ -197,6 +198,10 @@ export class MCPServer {
       const statusTools = createStatusTools(this.spotifyClient, this.authService);
       statusTools.forEach(tool => this.toolRegistry.registerTool(tool));
       
+      // Register user insights tools
+      const insightsTools = createInsightsTools(this.spotifyClient);
+      insightsTools.forEach(tool => this.toolRegistry.registerTool(tool));
+      
       const registeredTools = this.toolRegistry.listTools();
       this.logger.info('Tool registration complete', {
         registeredTools: registeredTools.map(t => t.name),
@@ -207,6 +212,7 @@ export class MCPServer {
           search: searchTools.length,
           queue: queueTools.length,
           status: statusTools.length,
+          insights: insightsTools.length,
         },
       });
       

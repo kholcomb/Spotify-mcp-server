@@ -245,6 +245,13 @@ export interface SpotifyClient {
   getRecommendations(options: Record<string, unknown>): Promise<RecommendationsResponse>;
   getPlaylistTracks(playlistId: string, options?: Record<string, unknown>): Promise<PlaylistTracksResponse>;
   getAlbumTracks(albumId: string, options?: Record<string, unknown>): Promise<AlbumTracksResponse>;
+  // User Insights Methods
+  getUserTopTracks(options?: {timeRange?: 'short_term' | 'medium_term' | 'long_term'; limit?: number; offset?: number}): Promise<TopTracksResponse>;
+  getUserTopArtists(options?: {timeRange?: 'short_term' | 'medium_term' | 'long_term'; limit?: number; offset?: number}): Promise<TopArtistsResponse>;
+  getAudioFeatures(trackIds: string[]): Promise<AudioFeaturesResponse>;
+  getUserSavedTracks(options?: PaginationOptions): Promise<SavedTracksResponse>;
+  getUserSavedAlbums(options?: PaginationOptions): Promise<SavedAlbumsResponse>;
+  getUserFollowedArtists(options?: {after?: string; limit?: number}): Promise<FollowedArtistsResponse>;
 }
 
 export interface PlaybackOptions {
@@ -428,6 +435,138 @@ export interface AlbumTracksResponse {
   offset: number;
   next: string | null;
   previous: string | null;
+}
+
+// User Insights Types
+export interface TopTracksResponse {
+  items: SpotifyTrack[];
+  total: number;
+  limit: number;
+  offset: number;
+  href: string;
+  next: string | null;
+  previous: string | null;
+}
+
+export interface TopArtist {
+  id: string;
+  name: string;
+  genres: string[];
+  popularity: number;
+  followers: {
+    total: number;
+  };
+  images: Array<{
+    url: string;
+    height: number;
+    width: number;
+  }>;
+  external_urls: {
+    spotify: string;
+  };
+  uri: string;
+  type: 'artist';
+}
+
+export interface TopArtistsResponse {
+  items: TopArtist[];
+  total: number;
+  limit: number;
+  offset: number;
+  href: string;
+  next: string | null;
+  previous: string | null;
+}
+
+export interface AudioFeatures {
+  acousticness: number;
+  analysis_url: string;
+  danceability: number;
+  duration_ms: number;
+  energy: number;
+  id: string;
+  instrumentalness: number;
+  key: number;
+  liveness: number;
+  loudness: number;
+  mode: number;
+  speechiness: number;
+  tempo: number;
+  time_signature: number;
+  track_href: string;
+  type: 'audio_features';
+  uri: string;
+  valence: number;
+}
+
+export interface AudioFeaturesResponse {
+  audio_features: (AudioFeatures | null)[];
+}
+
+export interface SavedTrack {
+  added_at: string;
+  track: SpotifyTrack;
+}
+
+export interface SavedTracksResponse {
+  items: SavedTrack[];
+  total: number;
+  limit: number;
+  offset: number;
+  href: string;
+  next: string | null;
+  previous: string | null;
+}
+
+export interface SavedAlbum {
+  added_at: string;
+  album: {
+    id: string;
+    name: string;
+    uri: string;
+    artists: Array<{
+      id: string;
+      name: string;
+      external_urls: {
+        spotify: string;
+      };
+    }>;
+    release_date: string;
+    total_tracks: number;
+    images: Array<{
+      url: string;
+      height: number;
+      width: number;
+    }>;
+    external_urls: {
+      spotify: string;
+    };
+    album_type: string;
+    type: 'album';
+  };
+}
+
+export interface SavedAlbumsResponse {
+  items: SavedAlbum[];
+  total: number;
+  limit: number;
+  offset: number;
+  href: string;
+  next: string | null;
+  previous: string | null;
+}
+
+export interface FollowedArtistsResponse {
+  artists: {
+    items: TopArtist[];
+    total: number;
+    limit: number;
+    href: string;
+    next: string | null;
+    cursors: {
+      after: string;
+    };
+  };
 }
 
 // Auth types
