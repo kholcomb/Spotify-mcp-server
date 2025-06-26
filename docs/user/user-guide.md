@@ -8,6 +8,7 @@ The Spotify MCP Server enables your AI assistant to:
 - **Control music playback** (Premium required)
 - **Search Spotify's catalog** (all account types)
 - **Access your user data** (playlists, recently played, etc.)
+- **Analyze your music insights** (top tracks, artists, audio features)
 - **Manage your music queue** (Premium required)
 
 ## Getting Started
@@ -26,6 +27,8 @@ Simply talk to your AI assistant using natural language. The assistant will auto
 - "Play some jazz music"
 - "Search for songs by Taylor Swift"
 - "Skip to the next song"
+- "Show me my top tracks from this year"
+- "What are my most played artists?"
 
 ## Music Playback Control
 
@@ -189,6 +192,91 @@ Simply talk to your AI assistant using natural language. The assistant will auto
 "Show me my saved songs"
 "What albums have I saved?"
 "List my liked songs"
+```
+
+## Music Analytics and Insights
+
+### Understanding Your Music Taste
+
+**Top tracks and artists:**
+```
+"Show me my top tracks from this year"
+"What are my most played songs?"
+"Show me my top artists from the last few months"
+"Who are my most listened to artists of all time?"
+```
+
+**Time period variations:**
+```
+"Show me my top tracks from the last 4 weeks"
+"What were my favorite songs over the last 6 months?"
+"Show me my all-time favorite artists"
+```
+
+### Audio Analysis
+
+**Analyze track characteristics:**
+```
+"Analyze the audio features of my current song"
+"What are the audio characteristics of 'Bohemian Rhapsody'?"
+"Show me the danceability and energy of my top tracks"
+```
+
+**Compare tracks:**
+```
+"Compare the audio features of my top 5 songs"
+"How energetic are the songs in my 'Workout' playlist?"
+"What's the tempo of my favorite tracks?"
+```
+
+### Library Insights
+
+**Saved content analysis:**
+```
+"Show me my saved tracks organized by when I added them"
+"What albums have I saved recently?"
+"Browse my music library by artist"
+```
+
+**Following insights:**
+```
+"Show me the artists I follow on Spotify"
+"Who are the most popular artists I follow?"
+"List the artists I follow by genre"
+```
+
+### Audio Features Explained
+
+When you ask for audio analysis, you'll see these characteristics:
+
+- **Danceability** (0.0-1.0): How suitable a track is for dancing
+- **Energy** (0.0-1.0): Perceptual measure of intensity and power
+- **Valence** (0.0-1.0): Musical positivity conveyed (happy vs sad)
+- **Acousticness** (0.0-1.0): Confidence the track is acoustic
+- **Instrumentalness** (0.0-1.0): Whether track contains vocals
+- **Liveness** (0.0-1.0): Presence of audience in the recording
+- **Speechiness** (0.0-1.0): Presence of spoken words
+- **Tempo** (BPM): Overall estimated tempo in beats per minute
+- **Loudness** (dB): Overall loudness of the track
+
+### Time Periods for Top Content
+
+**Short Term (4 weeks):**
+```
+"Show me my recent favorites"
+"What have I been into lately?"
+```
+
+**Medium Term (6 months):**
+```
+"Show me my top tracks this year"
+"What are my current favorite artists?"
+```
+
+**Long Term (years):**
+```
+"Show me my all-time favorites"
+"What are my most played songs ever?"
 ```
 
 ## Natural Language Examples

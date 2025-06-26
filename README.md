@@ -13,6 +13,7 @@ Control Spotify with natural language through Claude Desktop! This Model Context
 - 🎯 **Natural Language Control**: "Play Bohemian Rhapsody", "Skip to next track", "Set volume to 50"
 - 🔍 **Smart Search**: Find tracks, albums, artists, playlists with flexible queries
 - 🎵 **Full Playback Control**: Play, pause, skip, seek, volume, shuffle, repeat
+- 📊 **Music Analytics**: Discover your top tracks, artists, and audio feature analysis
 - 📱 **Multi-Device Support**: Control any of your Spotify-connected devices
 - 🔐 **Secure Authentication**: OAuth 2.0 + PKCE flow with encrypted token storage
 - ⚡ **Real-time Updates**: Get current playback status and queue information
@@ -64,6 +65,12 @@ Once set up, use natural language with Claude:
 - **"Switch playback to my phone"**
 - **"Show what's currently playing"**
 
+### 📊 Music Analytics
+- **"Show me my top tracks from this year"**
+- **"What are my most played artists?"**
+- **"Analyze the audio features of my saved songs"**
+- **"Show me my music library"**
+
 ### 🔐 Account Management
 - **"Show my Spotify profile"**
 - **"Check authentication status"**
@@ -83,7 +90,7 @@ Once set up, use natural language with Claude:
 ### Core Components
 
 - **🔐 Authentication**: Secure OAuth 2.0 + PKCE flow
-- **🛠️ Tool Registry**: 21 specialized tools for Spotify operations
+- **🛠️ Tool Registry**: 27 specialized tools for Spotify operations
 - **🔄 Request Handler**: Intelligent request routing and validation
 - **📊 Rate Limiter**: Automatic rate limiting and retry logic
 - **🛡️ Security Layer**: Certificate pinning, HSM support, encrypted storage
@@ -98,6 +105,7 @@ Once set up, use natural language with Claude:
 | **Queue** | `add_to_queue`, `get_queue`, `clear_queue`, `add_playlist_to_queue` | Queue management |
 | **Devices** | `get_devices`, `transfer_playback` | Multi-device control |
 | **Status** | `get_playback_status`, `get_user_profile` | Information retrieval |
+| **Insights** | `get_user_top_tracks`, `get_user_top_artists`, `get_audio_features`, `get_user_saved_tracks`, `get_user_saved_albums`, `get_user_followed_artists` | Music analytics and library insights |
 | **Auth** | `authenticate`, `get_auth_status` | Authentication management |
 
 ## 🔧 Requirements
