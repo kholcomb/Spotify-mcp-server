@@ -1,0 +1,123 @@
+# Production Docker Compose Configuration with HTTPS Support
+# Use this for production deployments with secure redirect URIs
+
+version: '3.8'
+
+services:
+  spotify-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: spotify-mcp-prod
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+      - SPOTIFY_REDIRECT_URI=${SPOTIFY_REDIRECT_URI}
+      - SPOTIFY_ALLOWED_DOMAINS=${SPOTIFY_ALLOWED_DOMAINS}
+      - LOG_LEVEL=warn
+      - REQUIRE_HARDWARE_HSM=false
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount SSL certificates if using direct HTTPS
+      - ./ssl/cert.pem:/app/ssl/cert.pem:ro
+      - ./ssl/key.pem:/app/ssl/key.pem:ro
+      # Persistent storage for tokens and configuration
+      - spotify-mcp-data:/app/data
+      - spotify-mcp-logs:/app/logs
+    networks:
+      - spotify-mcp-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "
+        const http = require('http');
+        const req = http.request({
+          host: 'localhost',
+          port: 3000,
+          path: '/health',
+          timeout: 2000
+        }, (res) => process.exit(res.statusCode === 200 ? 0 : 1));
+        req.on('error', () => process.exit(1));
+        req.end();
+      "]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/tmp
+
+  # NGINX reverse proxy for HTTPS termination
+  nginx:
+    image: nginx:1.24-alpine
+    container_name: spotify-mcp-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/spotify-mcp.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - spotify-mcp
+    networks:
+      - spotify-mcp-network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+
+  # Optional: Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: spotify-mcp-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - spotify-mcp-network
+    profiles:
+      - monitoring
+
+volumes:
+  spotify-mcp-data:
+    driver: local
+  spotify-mcp-logs:
+    driver: local
+  nginx-logs:
+    driver: local
+  prometheus-data:
+    driver: local
+
+networks:
+  spotify-mcp-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv6: "false"

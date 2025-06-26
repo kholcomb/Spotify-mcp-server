@@ -1,0 +1,88 @@
+name: Help & Support
+description: Get help with setup, configuration, or usage
+title: "[Help]: "
+labels: ["question", "help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Need help with the Spotify MCP Server? 🤝
+        
+        Please check our documentation first:
+        - [Installation Guide](https://github.com/your-username/spotify-mcp-server/blob/main/INSTALLATION_GUIDE.md)
+        - [README](https://github.com/your-username/spotify-mcp-server/blob/main/README.md)
+        - [Documentation](https://github.com/your-username/spotify-mcp-server/tree/main/docs)
+
+  - type: dropdown
+    id: help-type
+    attributes:
+      label: What do you need help with?
+      description: Select the category that best describes your question
+      options:
+        - Installation and setup
+        - Authentication with Spotify
+        - Claude Desktop configuration
+        - Usage and commands
+        - Troubleshooting errors
+        - Performance issues
+        - Security questions
+        - Development and contributing
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: Describe your question or what you're trying to accomplish
+      placeholder: "I'm trying to... but I'm having trouble with..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What have you tried?
+      description: Tell us what steps you've already taken
+      placeholder: |
+        - I tried following the installation guide
+        - I checked the documentation
+        - I looked at similar issues
+        - etc.
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: What operating system are you using?
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Other (please specify below)
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js Version
+      description: What version of Node.js are you running? (run `node --version`)
+      placeholder: "v18.0.0"
+
+  - type: textarea
+    id: error-output
+    attributes:
+      label: Error Messages or Log Output
+      description: |
+        If you're getting errors, please paste them here.
+        Check: `/Users/yourname/Library/Logs/Claude/mcp-server-spotify.log`
+        
+        **Important**: Remove any sensitive information like API keys!
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other information that might help us assist you
+      placeholder: Screenshots, configuration files (with secrets removed), etc.

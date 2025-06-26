@@ -1,0 +1,177 @@
+# Git Attributes Configuration for Spotify MCP Server
+# 
+# This file ensures consistent handling of line endings, binary files,
+# and repository statistics across different platforms and Git operations.
+#
+# Documentation: https://git-scm.com/docs/gitattributes
+
+# =============================================================================
+# Line Ending Normalization
+# =============================================================================
+
+# Auto-detect text files and perform LF normalization
+* text=auto
+
+# Explicitly declare files that should be normalized and converted to native line endings on checkout
+*.ts text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.xml text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.sass text eol=lf
+*.less text eol=lf
+*.txt text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Configuration files
+.gitignore text eol=lf
+.gitattributes text eol=lf
+.editorconfig text eol=lf
+.eslintrc* text eol=lf
+.prettierrc* text eol=lf
+tsconfig*.json text eol=lf
+jest.config.js text eol=lf
+package*.json text eol=lf
+Dockerfile text eol=lf
+docker-compose*.yml text eol=lf
+
+# Documentation
+README* text eol=lf
+CHANGELOG* text eol=lf
+LICENSE* text eol=lf
+CONTRIBUTING* text eol=lf
+SECURITY* text eol=lf
+*.md text eol=lf
+
+# =============================================================================
+# Binary Files
+# =============================================================================
+
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.webp binary
+*.bmp binary
+*.tiff binary
+
+# Audio/Video
+*.mp3 binary
+*.mp4 binary
+*.wav binary
+*.avi binary
+*.mov binary
+*.wmv binary
+*.flv binary
+
+# Archives
+*.zip binary
+*.tar binary
+*.gz binary
+*.tgz binary
+*.rar binary
+*.7z binary
+
+# Fonts
+*.woff binary
+*.woff2 binary
+*.eot binary
+*.ttf binary
+*.otf binary
+
+# Certificates and Keys (should be in .gitignore but marking as binary if present)
+*.p12 binary
+*.pfx binary
+*.pem binary
+*.key binary
+*.crt binary
+*.csr binary
+
+# Other binary formats
+*.pdf binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+
+# =============================================================================
+# Language-specific Configurations
+# =============================================================================
+
+# TypeScript/JavaScript
+*.ts linguist-language=TypeScript
+*.js linguist-language=JavaScript
+*.json linguist-language=JSON
+
+# Exclude generated files from language statistics
+build/ linguist-generated=true
+dist/ linguist-generated=true
+coverage/ linguist-generated=true
+node_modules/ linguist-vendored=true
+*.min.js linguist-generated=true
+*.min.css linguist-generated=true
+
+# Mark certain files as documentation
+docs/ linguist-documentation=true
+*.md linguist-documentation=true
+CHANGELOG* linguist-documentation=true
+CONTRIBUTING* linguist-documentation=true
+LICENSE* linguist-documentation=true
+
+# =============================================================================
+# Export Control
+# =============================================================================
+
+# Files to exclude from exports (git archive)
+.github/ export-ignore
+.vscode/ export-ignore
+tests/ export-ignore
+coverage/ export-ignore
+*.test.ts export-ignore
+*.spec.ts export-ignore
+.eslintrc* export-ignore
+.prettierrc* export-ignore
+jest.config.js export-ignore
+tsconfig.json export-ignore
+
+# Development files
+.env.example export-ignore
+docker-compose.yml export-ignore
+docker-compose.production.yml export-ignore
+
+# =============================================================================
+# Merge Strategies
+# =============================================================================
+
+# Use union merge for changelog to avoid conflicts
+CHANGELOG.md merge=union
+
+# Use ours strategy for package-lock.json to avoid complex merge conflicts
+package-lock.json merge=ours
+
+# =============================================================================
+# Diff Settings
+# =============================================================================
+
+# Use appropriate diff drivers for specific file types
+*.md diff=markdown
+*.json diff=json
+
+# =============================================================================
+# Filter Settings
+# =============================================================================
+
+# Clean filter for removing sensitive data (if needed)
+# Note: This is just a placeholder - implement actual filters if needed
+# *.env filter=secret
