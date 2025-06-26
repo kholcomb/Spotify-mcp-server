@@ -233,6 +233,8 @@ export interface SpotifyClient {
   setVolume(volumePercent: number, deviceId?: string): Promise<void>;
   setShuffle(state: boolean, deviceId?: string): Promise<void>;
   setRepeat(state: 'off' | 'track' | 'context', deviceId?: string): Promise<void>;
+  seek(positionMs: number, deviceId?: string): Promise<void>;
+  transferPlayback(deviceIds: string[], play?: boolean): Promise<void>;
   search(query: string, types: string[], options?: SearchOptions): Promise<SearchResults>;
   addToQueue(uri: string, deviceId?: string): Promise<void>;
   getQueue(): Promise<QueueState>;

@@ -408,6 +408,118 @@ export class SetRepeatTool implements MCPTool {
 }
 
 /**
+ * Tool for seeking to specific position in track
+ */
+export class SeekTool implements MCPTool {
+  public readonly name = 'seek';
+  public readonly description = 'Seek to specific position in current track';
+  
+  public readonly inputSchema = z.object({
+    position: z.number().min(0).describe('Position to seek to (milliseconds)'),
+    deviceId: z.string().optional().describe('Specific device ID to seek on'),
+  }).describe('Seek position options');
+
+  constructor(private spotifyClient: ISpotifyClient) {}
+
+  async execute(input: unknown): Promise<ToolResult> {
+    try {
+      const params = this.inputSchema.parse(input);
+      
+      await this.spotifyClient.seek(params.position, params.deviceId);
+      
+      return {
+        success: true,
+        data: {
+          message: `Seeked to position ${Math.floor(params.position / 1000)}s`,
+          position: params.position,
+        },
+      };
+    } catch (error) {
+      if (error instanceof SpotifyError) {
+        return {
+          success: false,
+          error: {
+            code: error.details.code,
+            message: error.message,
+            details: error.details,
+          },
+        };
+      }
+      
+      return {
+        success: false,
+        error: {
+          code: 'UNKNOWN_ERROR',
+          message: error instanceof Error ? error.message : 'Unknown error occurred',
+        },
+      };
+    }
+  }
+}
+
+/**
+ * Tool for transferring playback to different device
+ */
+export class TransferPlaybackTool implements MCPTool {
+  public readonly name = 'transfer_playback';
+  public readonly description = 'Transfer playback to a different device';
+  
+  public readonly inputSchema = z.object({
+    deviceId: z.string().describe('Device ID to transfer playback to'),
+    play: z.boolean().default(true).describe('Whether to ensure playback is active after transfer'),
+  }).describe('Playback transfer options');
+
+  constructor(private spotifyClient: ISpotifyClient) {}
+
+  async execute(input: unknown): Promise<ToolResult> {
+    try {
+      const params = this.inputSchema.parse(input);
+      
+      await this.spotifyClient.transferPlayback([params.deviceId], params.play);
+      
+      return {
+        success: true,
+        data: {
+          message: 'Playback transferred successfully',
+          deviceId: params.deviceId,
+          play: params.play,
+        },
+      };
+    } catch (error) {
+      if (error instanceof SpotifyDeviceError) {
+        return {
+          success: false,
+          error: {
+            code: 'DEVICE_ERROR',
+            message: error.message,
+            details: 'Check that the target device is available and active',
+          },
+        };
+      }
+      
+      if (error instanceof SpotifyError) {
+        return {
+          success: false,
+          error: {
+            code: error.details.code,
+            message: error.message,
+            details: error.details,
+          },
+        };
+      }
+      
+      return {
+        success: false,
+        error: {
+          code: 'UNKNOWN_ERROR',
+          message: error instanceof Error ? error.message : 'Unknown error occurred',
+        },
+      };
+    }
+  }
+}
+
+/**
  * Factory function to create all playback tools
  */
 export function createPlaybackTools(spotifyClient: ISpotifyClient): MCPTool[] {
@@ -419,5 +531,7 @@ export function createPlaybackTools(spotifyClient: ISpotifyClient): MCPTool[] {
     new SetVolumeTool(spotifyClient),
     new SetShuffleTool(spotifyClient),
     new SetRepeatTool(spotifyClient),
+    new SeekTool(spotifyClient),
+    new TransferPlaybackTool(spotifyClient),
   ];
 }

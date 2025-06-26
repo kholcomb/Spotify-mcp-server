@@ -412,6 +412,97 @@ export class AddPlaylistToQueueTool implements MCPTool {
 }
 
 /**
+ * Tool for clearing the current queue
+ */
+export class ClearQueueTool implements MCPTool {
+  public readonly name = 'clear_queue';
+  public readonly description = 'Clear the current playback queue';
+  
+  public readonly inputSchema = z.object({
+    deviceId: z.string().optional().describe('Specific device ID to clear queue on'),
+    keepCurrent: z.boolean().default(true).describe('Whether to keep currently playing track'),
+  }).describe('Queue clearing options');
+
+  constructor(private spotifyClient: ISpotifyClient) {}
+
+  async execute(input: unknown): Promise<ToolResult> {
+    try {
+      const params = this.inputSchema.parse(input);
+      
+      // Get current playback state
+      const currentPlayback = await this.spotifyClient.getCurrentPlayback();
+      
+      if (!currentPlayback || !currentPlayback.item) {
+        return {
+          success: true,
+          data: {
+            message: 'No active playback session to clear queue for',
+            cleared: false,
+          },
+        };
+      }
+
+      if (params.keepCurrent) {
+        // Start playback with just the current track to clear the queue
+        const playbackOptions: {
+          uris: string[];
+          positionMs: number;
+          deviceId?: string;
+        } = {
+          uris: [currentPlayback.item.uri],
+          positionMs: currentPlayback.progress_ms || 0,
+        };
+        
+        if (params.deviceId) {
+          playbackOptions.deviceId = params.deviceId;
+        }
+        
+        await this.spotifyClient.startPlayback(playbackOptions);
+        
+        return {
+          success: true,
+          data: {
+            message: 'Queue cleared while keeping current track',
+            currentTrack: currentPlayback.item.name,
+            cleared: true,
+          },
+        };
+      } else {
+        // Pause playback to stop everything
+        await this.spotifyClient.pausePlayback(params.deviceId);
+        
+        return {
+          success: true,
+          data: {
+            message: 'Queue and playback cleared',
+            cleared: true,
+          },
+        };
+      }
+    } catch (error) {
+      if (error instanceof SpotifyError) {
+        return {
+          success: false,
+          error: {
+            code: error.details.code,
+            message: error.message,
+            details: error.details,
+          },
+        };
+      }
+      
+      return {
+        success: false,
+        error: {
+          code: 'UNKNOWN_ERROR',
+          message: error instanceof Error ? error.message : 'Unknown error occurred',
+        },
+      };
+    }
+  }
+}
+
+/**
  * Factory function to create all queue management tools
  */
 export function createQueueTools(spotifyClient: ISpotifyClient): MCPTool[] {
@@ -419,5 +510,6 @@ export function createQueueTools(spotifyClient: ISpotifyClient): MCPTool[] {
     new AddToQueueTool(spotifyClient),
     new GetQueueTool(spotifyClient),
     new AddPlaylistToQueueTool(spotifyClient),
+    new ClearQueueTool(spotifyClient),
   ];
 }

@@ -25,7 +25,11 @@ A Model Context Protocol (MCP) server that provides standardized AI interfaces f
 1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 2. Create a new application
 3. Note your Client ID and Client Secret
-4. Add `http://localhost:8080/callback` to Redirect URIs
+4. Add redirect URI to your app settings:
+   - **Development**: `http://localhost:8080/callback`
+   - **Production**: `https://yourdomain.com/callback` (HTTPS required)
+
+> ⚠️ **Security Note**: Production deployments MUST use HTTPS redirect URIs. See [Redirect URI Security Guide](docs/REDIRECT_URI_SECURITY.md) for detailed setup instructions.
 
 ### 2. Installation
 
@@ -87,9 +91,11 @@ Add to your MCP client configuration (e.g., Claude Desktop):
 |----------|----------|---------|-------------|
 | `SPOTIFY_CLIENT_ID` | ✅ | - | Your Spotify application client ID |
 | `SPOTIFY_CLIENT_SECRET` | ✅ | - | Your Spotify application client secret |
-| `SPOTIFY_REDIRECT_URI` | ❌ | `http://localhost:8080/callback` | OAuth callback URI |
+| `SPOTIFY_REDIRECT_URI` | ✅ | `http://localhost:8080/callback` | OAuth callback URI (HTTPS required in production) |
+| `SPOTIFY_ALLOWED_DOMAINS` | ❌ | - | Comma-separated list of allowed domains for redirect URI validation |
+| `NODE_ENV` | ❌ | `development` | Environment: development, staging, production |
 | `LOG_LEVEL` | ❌ | `info` | Logging level (debug, info, warn, error) |
-| `TOKEN_ENCRYPTION_KEY` | ❌ | auto-generated | AES-256 key for token encryption |
+| `REQUIRE_HARDWARE_HSM` | ❌ | `false` | Require hardware HSM for token encryption in production |
 
 ## MCP Tools
 
@@ -134,6 +140,38 @@ The server follows a modular architecture with clear separation of concerns:
 - **Input Validation**: Comprehensive validation using Zod schemas
 - **Rate Limiting**: Automatic compliance with Spotify API limits
 - **No Credential Logging**: Tokens and secrets never logged
+
+## Production Deployment
+
+### Secure HTTPS Setup
+
+For production deployments, HTTPS is **required** for redirect URIs:
+
+```bash
+# Quick secure deployment (requires domain and SSL)
+./scripts/deploy-secure.sh --domain yourdomain.com --email admin@yourdomain.com
+
+# Docker Compose production deployment
+docker-compose -f docker-compose.production.yml up -d
+```
+
+### Configuration Steps
+
+1. **Set up SSL Certificate**: Use Let's Encrypt or your preferred certificate authority
+2. **Configure Environment**: Copy `.env.production.example` to `.env.production`
+3. **Update Spotify Dashboard**: Add HTTPS redirect URI (`https://yourdomain.com/callback`)
+4. **Deploy with Security**: Use the provided deployment scripts for secure setup
+
+📖 **Detailed Guide**: See [Redirect URI Security Guide](docs/REDIRECT_URI_SECURITY.md) for comprehensive production setup instructions.
+
+### Security Checklist
+
+- [ ] HTTPS redirect URI configured in Spotify Dashboard
+- [ ] Valid SSL certificate installed
+- [ ] Environment variables properly set
+- [ ] Domain DNS pointing to server
+- [ ] Firewall allowing HTTPS traffic (port 443)
+- [ ] Security headers configured (included in NGINX config)
 
 ## Contributing
 

@@ -198,6 +198,34 @@ export class SpotifyClient implements ISpotifyClient {
   }
   
   /**
+   * Seek to position in current track
+   */
+  async seek(positionMs: number, deviceId?: string): Promise<void> {
+    await this.request({
+      method: 'PUT',
+      url: '/me/player/seek',
+      params: {
+        position_ms: positionMs,
+        ...(deviceId ? { device_id: deviceId } : {}),
+      },
+    });
+  }
+  
+  /**
+   * Transfer playback to different device
+   */
+  async transferPlayback(deviceIds: string[], play?: boolean): Promise<void> {
+    await this.request({
+      method: 'PUT',
+      url: '/me/player',
+      data: {
+        device_ids: deviceIds,
+        play: play ?? true,
+      },
+    });
+  }
+  
+  /**
    * Search Spotify catalog
    */
   async search(query: string, types: string[], options?: SearchOptions): Promise<SearchResults> {

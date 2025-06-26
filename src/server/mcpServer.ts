@@ -79,7 +79,7 @@ export class MCPServer {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       this.logger.debug('Handling tools/list request');
       
-      const tools = this.toolRegistry.listTools();
+      const tools = this.toolRegistry.getToolsForMCP();
       
       this.logger.info('Returning tool list', {
         toolCount: tools.length,
@@ -87,11 +87,7 @@ export class MCPServer {
       });
       
       return {
-        tools: tools.map(tool => ({
-          name: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema,
-        })),
+        tools,
       };
     });
     

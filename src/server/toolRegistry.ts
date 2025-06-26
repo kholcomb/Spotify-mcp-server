@@ -65,6 +65,46 @@ export class ToolRegistry {
   listTools(): MCPTool[] {
     return Array.from(this.tools.values());
   }
+
+  /**
+   * Get tools in MCP protocol format with JSON Schema conversion
+   */
+  getToolsForMCP(): Array<{ name: string; description: string; inputSchema: object }> {
+    return Array.from(this.tools.values()).map(tool => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: this.convertToJsonSchema(tool.inputSchema)
+    }));
+  }
+
+  /**
+   * Convert Zod schema to JSON Schema format for MCP compatibility
+   */
+  private convertToJsonSchema(schema: object): object {
+    const schemaObj = schema as Record<string, unknown>;
+    
+    // If it's already a JSON Schema (has type property), return as-is
+    if (schemaObj.type) {
+      return schema;
+    }
+    
+    // If it's a Zod schema, create a basic JSON Schema
+    if (schemaObj._def) {
+      return {
+        type: 'object',
+        properties: {},
+        additionalProperties: true,
+        description: schemaObj.description || 'Tool input parameters'
+      };
+    }
+    
+    // Default fallback
+    return {
+      type: 'object',
+      properties: {},
+      additionalProperties: true
+    };
+  }
   
   /**
    * Get tool names
@@ -119,10 +159,15 @@ export class ToolRegistry {
       throw new Error('Tool name must be lowercase with underscores only');
     }
     
-    // Validate input schema has required JSON Schema properties
+    // Validate input schema - can be either Zod schema or JSON schema
     const schema = tool.inputSchema as Record<string, unknown>;
-    if (!schema.type) {
-      throw new Error('Tool input schema must have a type property');
+    
+    // Check if it's a Zod schema (has _def property) or JSON schema (has type property)
+    const hasZodDef = schema._def !== undefined;
+    const hasJsonSchemaType = schema.type !== undefined;
+    
+    if (!hasZodDef && !hasJsonSchemaType) {
+      throw new Error('Tool input schema must be a valid Zod schema or JSON Schema with type property');
     }
   }
   

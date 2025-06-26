@@ -7,6 +7,7 @@
 
 import { createHash } from 'crypto';
 import { Agent as HttpsAgent } from 'https';
+import type { TLSSocket } from 'tls';
 import type { Logger } from '../types/index.js';
 
 /**
@@ -217,8 +218,9 @@ export async function extractCertificateFingerprint(hostname: string): Promise<s
         rejectUnauthorized: false, // We want to get the cert even if invalid
       };
 
-      const req = https.request(options, (res: { socket: { getPeerCertificate(): { raw?: Buffer } } }) => {
-        const cert = res.socket.getPeerCertificate();
+      const req = https.request(options, (res) => {
+        const socket = res.socket as TLSSocket;
+        const cert = socket.getPeerCertificate();
         if (cert && cert.raw) {
           const hash = createHash('sha256');
           hash.update(cert.raw);

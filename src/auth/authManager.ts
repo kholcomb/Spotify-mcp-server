@@ -6,6 +6,7 @@ import axios from 'axios';
 import { z } from 'zod';
 import type { Logger } from '../types/index.js';
 import { HSMManager, HSMConfigurations, createHSMManager, type HSMAuditEntry } from '../security/hsmManager.js';
+import { RedirectUriValidator, type SecurityConfig } from '../config/security.js';
 
 /**
  * OAuth 2.0 authentication manager with PKCE flow for Spotify API
@@ -23,6 +24,7 @@ export class AuthManager {
   private readonly salt: Buffer;
   private readonly hsmManager: HSMManager;
   private hsmEncryptionKeyId?: string;
+  private readonly redirectUriValidator: RedirectUriValidator;
   
   private static readonly SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
   private static readonly SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
@@ -48,6 +50,26 @@ export class AuthManager {
     this.salt = this.getOrCreateSalt();
     this.encryptionKey = this.deriveEncryptionKey(config.clientSecret, this.salt);
     
+    // Initialize secure redirect URI validator
+    const environment = process.env.NODE_ENV === 'production' ? 'production' 
+                      : process.env.NODE_ENV === 'staging' ? 'staging' 
+                      : 'development';
+    const securityConfig: SecurityConfig = {
+      redirectUri: {
+        uri: config.redirectUri,
+        enforceHttps: environment === 'production',
+        allowedDomains: config.allowedDomains || [],
+        allowLocalhost: environment === 'development',
+        allowedSchemes: environment === 'production' ? ['https'] : ['http', 'https']
+      },
+      environment,
+      strictMode: environment === 'production'
+    };
+    this.redirectUriValidator = new RedirectUriValidator(securityConfig, logger);
+    
+    // Validate redirect URI on initialization
+    this.validateRedirectUriSecurity();
+    
     // Initialize HSM manager for enterprise-grade key management
     this.hsmManager = createHSMManager(
       HSMConfigurations.autoDetect(),
@@ -64,6 +86,30 @@ export class AuthManager {
         error: err.message,
       });
     });
+  }
+
+  /**
+   * Validate redirect URI security according to Spotify guidelines
+   */
+  private validateRedirectUriSecurity(): void {
+    const validation = this.redirectUriValidator.validateRedirectUri(this.redirectUri);
+    
+    if (!validation.valid) {
+      const errorMessage = `Insecure redirect URI configuration: ${validation.errors.join(', ')}`;
+      this.logger.error('Redirect URI security validation failed', {
+        uri: `${this.redirectUri.substring(0, 50)}...`,
+        errors: validation.errors,
+        warnings: validation.warnings
+      });
+      throw new AuthError(errorMessage, { retryable: false });
+    }
+    
+    if (validation.warnings.length > 0) {
+      this.logger.warn('Redirect URI security warnings', {
+        uri: `${this.redirectUri.substring(0, 50)}...`,
+        warnings: validation.warnings
+      });
+    }
   }
 
   /**
@@ -653,6 +699,8 @@ export interface AuthConfig {
   clientId: string;
   clientSecret: string;
   redirectUri: string;
+  /** Optional: List of allowed domains for redirect URI validation */
+  allowedDomains?: string[];
 }
 
 export interface AuthTokens {
