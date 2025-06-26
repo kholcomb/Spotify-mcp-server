@@ -1,8 +1,8 @@
 /**
  * Spotify user insights tools for MCP
  * 
- * Provides user-specific data including top tracks, top artists, audio features,
- * saved content, and followed artists through the MCP protocol.
+ * Provides user listening analytics, top content, and library access
+ * through the MCP protocol.
  */
 
 import { MCPTool, ToolResult } from '../types/index.js';
@@ -15,17 +15,14 @@ import { z } from 'zod';
  */
 export class GetUserTopTracksTool implements MCPTool {
   public readonly name = 'get_user_top_tracks';
-  public readonly description = 'Get the user\'s top tracks over different time periods';
+  public readonly description = 'Get user\'s top tracks based on listening history';
   
   public readonly inputSchema = z.object({
-    timeRange: z.enum(['short_term', 'medium_term', 'long_term'])
-      .default('medium_term')
-      .describe('Time period: short_term (4 weeks), medium_term (6 months), long_term (years)'),
-    limit: z.number().min(1).max(50).default(20)
-      .describe('Number of tracks to return (1-50)'),
-    offset: z.number().min(0).default(0)
-      .describe('Offset for pagination'),
-  }).describe('Top tracks request parameters');
+    time_range: z.enum(['short_term', 'medium_term', 'long_term']).optional()
+      .describe('Time range: short_term (~4 weeks), medium_term (~6 months), long_term (~1 year)'),
+    limit: z.number().min(1).max(50).optional().describe('Number of results (1-50, default 20)'),
+    offset: z.number().min(0).optional().describe('Offset for pagination (default 0)'),
+  }).describe('Options for getting top tracks');
 
   constructor(private spotifyClient: ISpotifyClient) {}
 
@@ -33,48 +30,44 @@ export class GetUserTopTracksTool implements MCPTool {
     try {
       const params = this.inputSchema.parse(input);
       
-      const response = await this.spotifyClient.getUserTopTracks({
-        timeRange: params.timeRange,
-        limit: params.limit,
-        offset: params.offset,
-      });
+      const options: { time_range?: 'short_term' | 'medium_term' | 'long_term'; limit?: number; offset?: number } = {};
+      if (params.time_range) options.time_range = params.time_range;
+      if (params.limit) options.limit = params.limit;
+      if (params.offset) options.offset = params.offset;
       
-      // Format tracks for better readability
-      const formattedTracks = response.items.map((track, index) => ({
-        rank: params.offset + index + 1,
-        id: track.id,
+      const topTracks = await this.spotifyClient.getUserTopTracks(options);
+
+      // Format track information for readability
+      const formattedTracks = topTracks.items.map((track, index) => ({
+        rank: (params.offset || 0) + index + 1,
         name: track.name,
-        artists: track.artists.map(artist => artist.name).join(', '),
+        artist: track.artists.map(a => a.name).join(', '),
         album: track.album.name,
         popularity: track.popularity,
-        duration: this.formatDuration(track.duration_ms),
+        duration: `${Math.floor(track.duration_ms / 60000)}:${String(Math.floor((track.duration_ms % 60000) / 1000)).padStart(2, '0')}`,
+        spotify_url: track.external_urls.spotify,
         uri: track.uri,
-        external_url: track.external_urls.spotify,
-        preview_url: track.preview_url,
       }));
-      
+
       return {
         success: true,
         data: {
           tracks: formattedTracks,
-          timeRange: params.timeRange,
-          total: response.total,
-          pagination: {
-            limit: params.limit,
-            offset: params.offset,
-            hasNext: response.next !== null,
-            hasPrevious: response.previous !== null,
-          },
+          time_range: params.time_range || 'medium_term',
+          total: topTracks.total,
+          limit: topTracks.limit,
+          offset: topTracks.offset,
         },
       };
+      
     } catch (error) {
       if (error instanceof SpotifyAuthError) {
         return {
           success: false,
           error: {
-            code: 'AUTH_ERROR',
-            message: error.message,
-            details: 'Please authenticate with Spotify first',
+            code: 'AUTH_REQUIRED',
+            message: 'Authentication required to access top tracks',
+            retryable: false,
           },
         };
       }
@@ -83,9 +76,9 @@ export class GetUserTopTracksTool implements MCPTool {
         return {
           success: false,
           error: {
-            code: error.details.code,
+            code: error.details.code || 'SPOTIFY_ERROR',
             message: error.message,
-            details: error.details,
+            retryable: error.details.retryable || false,
           },
         };
       }
@@ -94,16 +87,11 @@ export class GetUserTopTracksTool implements MCPTool {
         success: false,
         error: {
           code: 'UNKNOWN_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error occurred',
+          message: error instanceof Error ? error.message : 'Failed to get top tracks',
+          retryable: false,
         },
       };
     }
-  }
-
-  private formatDuration(ms: number): string {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 }
 
@@ -112,17 +100,14 @@ export class GetUserTopTracksTool implements MCPTool {
  */
 export class GetUserTopArtistsTool implements MCPTool {
   public readonly name = 'get_user_top_artists';
-  public readonly description = 'Get the user\'s top artists over different time periods';
+  public readonly description = 'Get user\'s top artists based on listening history';
   
   public readonly inputSchema = z.object({
-    timeRange: z.enum(['short_term', 'medium_term', 'long_term'])
-      .default('medium_term')
-      .describe('Time period: short_term (4 weeks), medium_term (6 months), long_term (years)'),
-    limit: z.number().min(1).max(50).default(20)
-      .describe('Number of artists to return (1-50)'),
-    offset: z.number().min(0).default(0)
-      .describe('Offset for pagination'),
-  }).describe('Top artists request parameters');
+    time_range: z.enum(['short_term', 'medium_term', 'long_term']).optional()
+      .describe('Time range: short_term (~4 weeks), medium_term (~6 months), long_term (~1 year)'),
+    limit: z.number().min(1).max(50).optional().describe('Number of results (1-50, default 20)'),
+    offset: z.number().min(0).optional().describe('Offset for pagination (default 0)'),
+  }).describe('Options for getting top artists');
 
   constructor(private spotifyClient: ISpotifyClient) {}
 
@@ -130,47 +115,43 @@ export class GetUserTopArtistsTool implements MCPTool {
     try {
       const params = this.inputSchema.parse(input);
       
-      const response = await this.spotifyClient.getUserTopArtists({
-        timeRange: params.timeRange,
-        limit: params.limit,
-        offset: params.offset,
-      });
+      const options: { time_range?: 'short_term' | 'medium_term' | 'long_term'; limit?: number; offset?: number } = {};
+      if (params.time_range) options.time_range = params.time_range;
+      if (params.limit) options.limit = params.limit;
+      if (params.offset) options.offset = params.offset;
       
-      // Format artists for better readability
-      const formattedArtists = response.items.map((artist, index) => ({
-        rank: params.offset + index + 1,
-        id: artist.id,
+      const topArtists = await this.spotifyClient.getUserTopArtists(options);
+
+      // Format artist information for readability
+      const formattedArtists = topArtists.items.map((artist, index) => ({
+        rank: (params.offset || 0) + index + 1,
         name: artist.name,
         genres: artist.genres,
         popularity: artist.popularity,
         followers: artist.followers.total,
+        spotify_url: artist.external_urls.spotify,
         uri: artist.uri,
-        external_url: artist.external_urls.spotify,
-        images: artist.images,
       }));
-      
+
       return {
         success: true,
         data: {
           artists: formattedArtists,
-          timeRange: params.timeRange,
-          total: response.total,
-          pagination: {
-            limit: params.limit,
-            offset: params.offset,
-            hasNext: response.next !== null,
-            hasPrevious: response.previous !== null,
-          },
+          time_range: params.time_range || 'medium_term',
+          total: topArtists.total,
+          limit: topArtists.limit,
+          offset: topArtists.offset,
         },
       };
+      
     } catch (error) {
       if (error instanceof SpotifyAuthError) {
         return {
           success: false,
           error: {
-            code: 'AUTH_ERROR',
-            message: error.message,
-            details: 'Please authenticate with Spotify first',
+            code: 'AUTH_REQUIRED',
+            message: 'Authentication required to access top artists',
+            retryable: false,
           },
         };
       }
@@ -179,9 +160,9 @@ export class GetUserTopArtistsTool implements MCPTool {
         return {
           success: false,
           error: {
-            code: error.details.code,
+            code: error.details.code || 'SPOTIFY_ERROR',
             message: error.message,
-            details: error.details,
+            retryable: error.details.retryable || false,
           },
         };
       }
@@ -190,7 +171,8 @@ export class GetUserTopArtistsTool implements MCPTool {
         success: false,
         error: {
           code: 'UNKNOWN_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error occurred',
+          message: error instanceof Error ? error.message : 'Failed to get top artists',
+          retryable: false,
         },
       };
     }
@@ -198,19 +180,15 @@ export class GetUserTopArtistsTool implements MCPTool {
 }
 
 /**
- * Tool for getting audio features of tracks
+ * Tool for getting audio features of a track
  */
 export class GetAudioFeaturesTool implements MCPTool {
   public readonly name = 'get_audio_features';
-  public readonly description = 'Get audio features for one or more tracks';
+  public readonly description = 'Get detailed audio features and analysis for a track';
   
   public readonly inputSchema = z.object({
-    trackIds: z.union([
-      z.string(),
-      z.array(z.string())
-    ]).transform(val => Array.isArray(val) ? val : [val])
-      .describe('Track ID(s) to get audio features for (max 100)'),
-  }).describe('Audio features request parameters');
+    track_id: z.string().min(1).describe('Spotify track ID'),
+  }).describe('Track ID for audio features analysis');
 
   constructor(private spotifyClient: ISpotifyClient) {}
 
@@ -218,60 +196,78 @@ export class GetAudioFeaturesTool implements MCPTool {
     try {
       const params = this.inputSchema.parse(input);
       
-      if (params.trackIds.length > 100) {
-        return {
-          success: false,
-          error: {
-            code: 'INVALID_REQUEST',
-            message: 'Maximum 100 track IDs allowed per request',
-          },
-        };
-      }
-      
-      const response = await this.spotifyClient.getAudioFeatures(params.trackIds);
-      
-      // Format audio features for better readability
-      const formattedFeatures = response.audio_features.map((features, index) => {
-        if (!features) {
-          return {
-            trackId: params.trackIds[index],
-            error: 'Audio features not available for this track',
-          };
-        }
-        
-        return {
-          trackId: features.id,
-          acousticness: Number(features.acousticness.toFixed(3)),
-          danceability: Number(features.danceability.toFixed(3)),
-          energy: Number(features.energy.toFixed(3)),
-          instrumentalness: Number(features.instrumentalness.toFixed(3)),
-          liveness: Number(features.liveness.toFixed(3)),
-          loudness: Number(features.loudness.toFixed(1)),
-          speechiness: Number(features.speechiness.toFixed(3)),
-          tempo: Number(features.tempo.toFixed(1)),
-          valence: Number(features.valence.toFixed(3)),
-          key: features.key,
-          mode: features.mode === 1 ? 'major' : 'minor',
-          time_signature: features.time_signature,
-          duration_ms: features.duration_ms,
-        };
-      });
-      
+      const features = await this.spotifyClient.getAudioFeatures(params.track_id);
+
+      // Format audio features with descriptions
+      const formattedFeatures = {
+        track_id: features.id,
+        danceability: {
+          value: features.danceability,
+          description: 'How suitable a track is for dancing (0.0 = least danceable, 1.0 = most danceable)',
+        },
+        energy: {
+          value: features.energy,
+          description: 'Perceptual measure of intensity and activity (0.0 = low energy, 1.0 = high energy)',
+        },
+        valence: {
+          value: features.valence,
+          description: 'Musical positiveness conveyed by track (0.0 = negative/sad, 1.0 = positive/happy)',
+        },
+        tempo: {
+          value: features.tempo,
+          description: 'Overall estimated tempo in beats per minute (BPM)',
+        },
+        acousticness: {
+          value: features.acousticness,
+          description: 'Confidence measure of whether track is acoustic (0.0 = not acoustic, 1.0 = acoustic)',
+        },
+        instrumentalness: {
+          value: features.instrumentalness,
+          description: 'Predicts whether track contains vocals (>0.5 likely instrumental)',
+        },
+        liveness: {
+          value: features.liveness,
+          description: 'Detects presence of audience in recording (>0.8 likely live performance)',
+        },
+        speechiness: {
+          value: features.speechiness,
+          description: 'Detects presence of spoken words (>0.66 likely speech, 0.33-0.66 may contain music and speech)',
+        },
+        loudness: {
+          value: features.loudness,
+          description: 'Overall loudness in decibels (dB), typically between -60 and 0 dB',
+        },
+        key: {
+          value: features.key,
+          description: `Musical key (${this.getKeyName(features.key)})`,
+        },
+        mode: {
+          value: features.mode,
+          description: features.mode === 1 ? 'Major scale' : 'Minor scale',
+        },
+        time_signature: {
+          value: features.time_signature,
+          description: 'Estimated time signature (number of beats per bar)',
+        },
+        duration_ms: features.duration_ms,
+      };
+
       return {
         success: true,
         data: {
           audio_features: formattedFeatures,
-          total: params.trackIds.length,
+          spotify_url: features.track_href,
         },
       };
+      
     } catch (error) {
       if (error instanceof SpotifyAuthError) {
         return {
           success: false,
           error: {
-            code: 'AUTH_ERROR',
-            message: error.message,
-            details: 'Please authenticate with Spotify first',
+            code: 'AUTH_REQUIRED',
+            message: 'Authentication required to access audio features',
+            retryable: false,
           },
         };
       }
@@ -280,9 +276,9 @@ export class GetAudioFeaturesTool implements MCPTool {
         return {
           success: false,
           error: {
-            code: error.details.code,
+            code: error.details.code || 'SPOTIFY_ERROR',
             message: error.message,
-            details: error.details,
+            retryable: error.details.retryable || false,
           },
         };
       }
@@ -291,10 +287,16 @@ export class GetAudioFeaturesTool implements MCPTool {
         success: false,
         error: {
           code: 'UNKNOWN_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error occurred',
+          message: error instanceof Error ? error.message : 'Failed to get audio features',
+          retryable: false,
         },
       };
     }
+  }
+
+  private getKeyName(key: number): string {
+    const keyNames = ['C', 'C♯/D♭', 'D', 'D♯/E♭', 'E', 'F', 'F♯/G♭', 'G', 'G♯/A♭', 'A', 'A♯/B♭', 'B'];
+    return keyNames[key] || 'Unknown';
   }
 }
 
@@ -303,14 +305,12 @@ export class GetAudioFeaturesTool implements MCPTool {
  */
 export class GetUserSavedTracksTool implements MCPTool {
   public readonly name = 'get_user_saved_tracks';
-  public readonly description = 'Get tracks from the user\'s library';
+  public readonly description = 'Get tracks saved in user\'s library (liked songs)';
   
   public readonly inputSchema = z.object({
-    limit: z.number().min(1).max(50).default(20)
-      .describe('Number of tracks to return (1-50)'),
-    offset: z.number().min(0).default(0)
-      .describe('Offset for pagination'),
-  }).describe('Saved tracks request parameters');
+    limit: z.number().min(1).max(50).optional().describe('Number of results (1-50, default 20)'),
+    offset: z.number().min(0).optional().describe('Offset for pagination (default 0)'),
+  }).describe('Options for getting saved tracks');
 
   constructor(private spotifyClient: ISpotifyClient) {}
 
@@ -318,49 +318,42 @@ export class GetUserSavedTracksTool implements MCPTool {
     try {
       const params = this.inputSchema.parse(input);
       
-      const response = await this.spotifyClient.getUserSavedTracks({
-        limit: params.limit,
-        offset: params.offset,
-      });
+      const options: { limit?: number; offset?: number } = {};
+      if (params.limit) options.limit = params.limit;
+      if (params.offset) options.offset = params.offset;
       
-      // Format tracks for better readability
-      const formattedTracks = response.items.map((item, index) => ({
-        position: params.offset + index + 1,
-        added_at: item.added_at,
-        track: {
-          id: item.track.id,
-          name: item.track.name,
-          artists: item.track.artists.map(artist => artist.name).join(', '),
-          album: item.track.album.name,
-          duration: this.formatDuration(item.track.duration_ms),
-          popularity: item.track.popularity,
-          uri: item.track.uri,
-          external_url: item.track.external_urls.spotify,
-          preview_url: item.track.preview_url,
-        },
+      const savedTracks = await this.spotifyClient.getUserSavedTracks(options);
+
+      // Format saved tracks with added date
+      const formattedTracks = savedTracks.items.map((item, index) => ({
+        position: (params.offset || 0) + index + 1,
+        name: item.track.name,
+        artist: item.track.artists.map(a => a.name).join(', '),
+        album: item.track.album.name,
+        added_at: new Date(item.added_at).toLocaleDateString(),
+        duration: `${Math.floor(item.track.duration_ms / 60000)}:${String(Math.floor((item.track.duration_ms % 60000) / 1000)).padStart(2, '0')}`,
+        spotify_url: item.track.external_urls.spotify,
+        uri: item.track.uri,
       }));
-      
+
       return {
         success: true,
         data: {
-          tracks: formattedTracks,
-          total: response.total,
-          pagination: {
-            limit: params.limit,
-            offset: params.offset,
-            hasNext: response.next !== null,
-            hasPrevious: response.previous !== null,
-          },
+          saved_tracks: formattedTracks,
+          total: savedTracks.total,
+          limit: savedTracks.limit,
+          offset: savedTracks.offset,
         },
       };
+      
     } catch (error) {
       if (error instanceof SpotifyAuthError) {
         return {
           success: false,
           error: {
-            code: 'AUTH_ERROR',
-            message: error.message,
-            details: 'Please authenticate with Spotify first',
+            code: 'AUTH_REQUIRED',
+            message: 'Authentication required to access saved tracks',
+            retryable: false,
           },
         };
       }
@@ -369,9 +362,9 @@ export class GetUserSavedTracksTool implements MCPTool {
         return {
           success: false,
           error: {
-            code: error.details.code,
+            code: error.details.code || 'SPOTIFY_ERROR',
             message: error.message,
-            details: error.details,
+            retryable: error.details.retryable || false,
           },
         };
       }
@@ -380,16 +373,11 @@ export class GetUserSavedTracksTool implements MCPTool {
         success: false,
         error: {
           code: 'UNKNOWN_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error occurred',
+          message: error instanceof Error ? error.message : 'Failed to get saved tracks',
+          retryable: false,
         },
       };
     }
-  }
-
-  private formatDuration(ms: number): string {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 }
 
@@ -398,14 +386,12 @@ export class GetUserSavedTracksTool implements MCPTool {
  */
 export class GetUserSavedAlbumsTool implements MCPTool {
   public readonly name = 'get_user_saved_albums';
-  public readonly description = 'Get albums from the user\'s library';
+  public readonly description = 'Get albums saved in user\'s library';
   
   public readonly inputSchema = z.object({
-    limit: z.number().min(1).max(50).default(20)
-      .describe('Number of albums to return (1-50)'),
-    offset: z.number().min(0).default(0)
-      .describe('Offset for pagination'),
-  }).describe('Saved albums request parameters');
+    limit: z.number().min(1).max(50).optional().describe('Number of results (1-50, default 20)'),
+    offset: z.number().min(0).optional().describe('Offset for pagination (default 0)'),
+  }).describe('Options for getting saved albums');
 
   constructor(private spotifyClient: ISpotifyClient) {}
 
@@ -413,49 +399,45 @@ export class GetUserSavedAlbumsTool implements MCPTool {
     try {
       const params = this.inputSchema.parse(input);
       
-      const response = await this.spotifyClient.getUserSavedAlbums({
-        limit: params.limit,
-        offset: params.offset,
-      });
+      const options: { limit?: number; offset?: number } = {};
+      if (params.limit) options.limit = params.limit;
+      if (params.offset) options.offset = params.offset;
       
-      // Format albums for better readability
-      const formattedAlbums = response.items.map((item, index) => ({
-        position: params.offset + index + 1,
-        added_at: item.added_at,
-        album: {
-          id: item.album.id,
-          name: item.album.name,
-          artists: item.album.artists.map(artist => artist.name).join(', '),
-          release_date: item.album.release_date,
-          total_tracks: item.album.total_tracks,
-          album_type: item.album.album_type,
-          uri: item.album.uri,
-          external_url: item.album.external_urls.spotify,
-          images: item.album.images,
-        },
+      const savedAlbums = await this.spotifyClient.getUserSavedAlbums(options);
+
+      // Format saved albums with added date
+      const formattedAlbums = savedAlbums.items.map((item, index) => ({
+        position: (params.offset || 0) + index + 1,
+        name: item.album.name,
+        artist: item.album.artists.map(a => a.name).join(', '),
+        album_type: item.album.album_type,
+        release_date: item.album.release_date,
+        total_tracks: item.album.total_tracks,
+        added_at: new Date(item.added_at).toLocaleDateString(),
+        genres: item.album.genres,
+        popularity: item.album.popularity,
+        spotify_url: item.album.external_urls.spotify,
+        uri: item.album.uri,
       }));
-      
+
       return {
         success: true,
         data: {
-          albums: formattedAlbums,
-          total: response.total,
-          pagination: {
-            limit: params.limit,
-            offset: params.offset,
-            hasNext: response.next !== null,
-            hasPrevious: response.previous !== null,
-          },
+          saved_albums: formattedAlbums,
+          total: savedAlbums.total,
+          limit: savedAlbums.limit,
+          offset: savedAlbums.offset,
         },
       };
+      
     } catch (error) {
       if (error instanceof SpotifyAuthError) {
         return {
           success: false,
           error: {
-            code: 'AUTH_ERROR',
-            message: error.message,
-            details: 'Please authenticate with Spotify first',
+            code: 'AUTH_REQUIRED',
+            message: 'Authentication required to access saved albums',
+            retryable: false,
           },
         };
       }
@@ -464,9 +446,9 @@ export class GetUserSavedAlbumsTool implements MCPTool {
         return {
           success: false,
           error: {
-            code: error.details.code,
+            code: error.details.code || 'SPOTIFY_ERROR',
             message: error.message,
-            details: error.details,
+            retryable: error.details.retryable || false,
           },
         };
       }
@@ -475,7 +457,8 @@ export class GetUserSavedAlbumsTool implements MCPTool {
         success: false,
         error: {
           code: 'UNKNOWN_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error occurred',
+          message: error instanceof Error ? error.message : 'Failed to get saved albums',
+          retryable: false,
         },
       };
     }
@@ -490,11 +473,9 @@ export class GetUserFollowedArtistsTool implements MCPTool {
   public readonly description = 'Get artists followed by the user';
   
   public readonly inputSchema = z.object({
-    limit: z.number().min(1).max(50).default(20)
-      .describe('Number of artists to return (1-50)'),
-    after: z.string().optional()
-      .describe('Artist ID to start after (for pagination)'),
-  }).describe('Followed artists request parameters');
+    limit: z.number().min(1).max(50).optional().describe('Number of results (1-50, default 20)'),
+    after: z.string().optional().describe('Cursor for pagination'),
+  }).describe('Options for getting followed artists');
 
   constructor(private spotifyClient: ISpotifyClient) {}
 
@@ -502,45 +483,41 @@ export class GetUserFollowedArtistsTool implements MCPTool {
     try {
       const params = this.inputSchema.parse(input);
       
-      const response = await this.spotifyClient.getUserFollowedArtists({
-        limit: params.limit,
-        ...(params.after && { after: params.after }),
-      });
+      const options: { type: 'artist'; limit?: number; after?: string } = { type: 'artist' };
+      if (params.limit) options.limit = params.limit;
+      if (params.after) options.after = params.after;
       
-      // Format artists for better readability
-      const formattedArtists = response.artists.items.map((artist, index) => ({
+      const followedArtists = await this.spotifyClient.getUserFollowedArtists(options);
+
+      // Format followed artists
+      const formattedArtists = followedArtists.artists.items.map((artist, index) => ({
         position: index + 1,
-        id: artist.id,
         name: artist.name,
         genres: artist.genres,
         popularity: artist.popularity,
         followers: artist.followers.total,
+        spotify_url: artist.external_urls.spotify,
         uri: artist.uri,
-        external_url: artist.external_urls.spotify,
-        images: artist.images,
       }));
-      
+
       return {
         success: true,
         data: {
-          artists: formattedArtists,
-          total: response.artists.total,
-          pagination: {
-            limit: params.limit,
-            after: params.after,
-            hasNext: response.artists.next !== null,
-            nextCursor: response.artists.cursors?.after,
-          },
+          followed_artists: formattedArtists,
+          total: followedArtists.artists.total,
+          limit: followedArtists.artists.limit,
+          next_cursor: followedArtists.artists.cursors.after,
         },
       };
+      
     } catch (error) {
       if (error instanceof SpotifyAuthError) {
         return {
           success: false,
           error: {
-            code: 'AUTH_ERROR',
-            message: error.message,
-            details: 'Please authenticate with Spotify first',
+            code: 'AUTH_REQUIRED',
+            message: 'Authentication required to access followed artists',
+            retryable: false,
           },
         };
       }
@@ -549,9 +526,9 @@ export class GetUserFollowedArtistsTool implements MCPTool {
         return {
           success: false,
           error: {
-            code: error.details.code,
+            code: error.details.code || 'SPOTIFY_ERROR',
             message: error.message,
-            details: error.details,
+            retryable: error.details.retryable || false,
           },
         };
       }
@@ -560,7 +537,8 @@ export class GetUserFollowedArtistsTool implements MCPTool {
         success: false,
         error: {
           code: 'UNKNOWN_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error occurred',
+          message: error instanceof Error ? error.message : 'Failed to get followed artists',
+          retryable: false,
         },
       };
     }
@@ -568,7 +546,7 @@ export class GetUserFollowedArtistsTool implements MCPTool {
 }
 
 /**
- * Factory function to create all insights tools
+ * Factory function to create all user insights tools
  */
 export function createInsightsTools(spotifyClient: ISpotifyClient): MCPTool[] {
   return [
