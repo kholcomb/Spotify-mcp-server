@@ -169,14 +169,16 @@ export class SoftwareHSMProvider implements HSMProvider {
     }
     
     const crypto = await import('crypto');
-    const iv = randomBytes(16);
-    const cipher = crypto.createCipher(algorithm, keyEntry.key);
+    const iv = randomBytes(12); // GCM typically uses 12-byte IV
+    const cipher = crypto.createCipher('aes-256-gcm', keyEntry.key);
+    cipher.setAAD(Buffer.from('authenticated'));
     
     let encrypted = cipher.update(plaintext);
     encrypted = Buffer.concat([encrypted, cipher.final()]);
+    const authTag = cipher.getAuthTag();
     
-    // Prepend IV for GCM mode
-    return Buffer.concat([iv, encrypted]);
+    // Prepend IV and auth tag for GCM mode
+    return Buffer.concat([iv, authTag, encrypted]);
   }
   
   async decrypt(keyId: string, ciphertext: Buffer, algorithm = 'aes-256-gcm'): Promise<Buffer> {
@@ -186,10 +188,13 @@ export class SoftwareHSMProvider implements HSMProvider {
     }
     
     const crypto = await import('crypto');
-    const _iv = ciphertext.subarray(0, 16);
-    const encrypted = ciphertext.subarray(16);
+    const iv = ciphertext.subarray(0, 12); // Extract 12-byte IV
+    const authTag = ciphertext.subarray(12, 28); // Extract 16-byte auth tag
+    const encrypted = ciphertext.subarray(28); // Remaining is encrypted data
     
-    const decipher = crypto.createDecipher(algorithm, keyEntry.key);
+    const decipher = crypto.createDecipher('aes-256-gcm', keyEntry.key);
+    decipher.setAAD(Buffer.from('authenticated'));
+    decipher.setAuthTag(authTag);
     
     let decrypted = decipher.update(encrypted);
     decrypted = Buffer.concat([decrypted, decipher.final()]);

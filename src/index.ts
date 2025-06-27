@@ -10,6 +10,9 @@
 import { SimpleLogger } from './utils/logger.js';
 import { loadConfig, validateEnvironment } from './utils/config.js';
 import { MCPServer } from './server/index.js';
+import { createSecurityConfigManager, getSecurityConfigFromEnv } from './security/securityConfig.js';
+import { createSecureLogger } from './security/secureLogger.js';
+import type { SecurityEnvironment } from './security/securityConfig.js';
 
 // Load environment variables only if not in DXT context
 // DXT runtime provides environment variables directly
@@ -33,9 +36,17 @@ async function main(): Promise<void> {
   let mcpServer: MCPServer | null = null;
   
   try {
+    // Initialize security configuration
+    const { environment, overrides } = getSecurityConfigFromEnv();
     
-    // Initialize logger
-    const logger = new SimpleLogger(process.env.LOG_LEVEL as 'debug' | 'info' | 'warn' | 'error' || 'info');
+    // Initialize base logger
+    const baseLogger = new SimpleLogger(process.env.LOG_LEVEL as 'debug' | 'info' | 'warn' | 'error' || 'info');
+    
+    // Initialize security config manager
+    const securityConfigManager = createSecurityConfigManager(environment, baseLogger, overrides);
+    
+    // Initialize secure logger with PII masking
+    const logger = createSecureLogger(baseLogger, securityConfigManager.getSecureLoggerConfig());
     
     logger.info('Starting Spotify MCP Server...');
 
@@ -47,9 +58,24 @@ async function main(): Promise<void> {
       logLevel: serverConfig.logLevel,
     });
 
-    // Initialize and start MCP server
-    mcpServer = new MCPServer(serverConfig, logger);
+    // Initialize and start MCP server with security configuration
+    mcpServer = new MCPServer(serverConfig, logger, securityConfigManager);
     await mcpServer.start();
+    
+    // Log security posture validation
+    const securityPosture = securityConfigManager.validateSecurityPosture();
+    logger.info('Security posture validated', {
+      score: securityPosture.score,
+      issues: securityPosture.issues.length,
+      recommendations: securityPosture.recommendations.length,
+    });
+    
+    if (securityPosture.issues.length > 0) {
+      logger.warn('Security issues detected', {
+        issues: securityPosture.issues,
+        recommendations: securityPosture.recommendations,
+      });
+    }
 
     logger.info('Spotify MCP Server started successfully');
 

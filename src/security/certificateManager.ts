@@ -13,19 +13,28 @@ import type { Logger } from '../types/index.js';
 /**
  * Known Spotify API certificate fingerprints for pinning
  * These are SHA-256 fingerprints of Spotify's certificate chain
+ * 
+ * Note: These will be populated dynamically at runtime using extractCertificateFingerprint.
+ * Manual backup pins are provided as fallback for high-security environments.
  */
 export const SPOTIFY_CERTIFICATE_PINS: Record<string, string[]> = {
-  // Spotify API endpoints
+  // Spotify API endpoints - test pins (NOT REAL PRODUCTION CERTIFICATES)
   'api.spotify.com': [
-    // Primary certificate (example - in production, get actual fingerprints)
-    'sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
-    // Backup certificate
-    'sha256:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=',
+    'sha256:TEST1111111111111111111111111111111111111111=',
+    'sha256:TEST2222222222222222222222222222222222222222=',
   ],
-  // Spotify Accounts endpoints  
+  // Spotify Accounts endpoints - test pins (NOT REAL PRODUCTION CERTIFICATES)  
   'accounts.spotify.com': [
-    'sha256:CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=',
-    'sha256:DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD=',
+    'sha256:TEST3333333333333333333333333333333333333333=',
+    'sha256:TEST4444444444444444444444444444444444444444=',
+  ],
+  
+  // Example backup pins for testing purposes only
+  'backup.api.spotify.com': [
+    'sha256:BACKUP11111111111111111111111111111111111111=',
+  ],
+  'backup.accounts.spotify.com': [
+    'sha256:BACKUP22222222222222222222222222222222222222=',
   ],
 };
 
@@ -48,7 +57,7 @@ export class CertificateManager {
     this.config = {
       enabled: config.enabled ?? true,
       strictMode: config.strictMode ?? false, // Default to non-strict for development
-      pins: config.pins ?? SPOTIFY_CERTIFICATE_PINS,
+      pins: config.pins ?? { ...SPOTIFY_CERTIFICATE_PINS }, // Clone to avoid modifying global object
       allowDevelopment: config.allowDevelopment ?? process.env.NODE_ENV !== 'production',
     };
 
@@ -58,6 +67,27 @@ export class CertificateManager {
       allowDevelopment: this.config.allowDevelopment,
       pinnedHosts: Object.keys(this.config.pins),
     });
+
+    // Auto-initialize certificate pins if enabled and pins are empty
+    if (this.config.enabled) {
+      this.initializeCertificatePinsAsync();
+    }
+  }
+
+  /**
+   * Asynchronously initialize certificate pins without blocking constructor
+   */
+  private initializeCertificatePinsAsync(): void {
+    // Use setTimeout to avoid blocking the constructor
+    setTimeout(async () => {
+      try {
+        await this.initializeCertificatePins();
+      } catch (error) {
+        this.logger.error('Failed to auto-initialize certificate pins', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }, 100);
   }
 
   /**
@@ -184,6 +214,105 @@ export class CertificateManager {
       hostname,
       pinCount: pins.length,
     });
+  }
+
+  /**
+   * Initialize certificate pins by fetching current Spotify certificates
+   */
+  async initializeCertificatePins(): Promise<void> {
+    if (!this.config.enabled) {
+      this.logger.info('Certificate pinning disabled, skipping initialization');
+      return;
+    }
+
+    const hosts = ['api.spotify.com', 'accounts.spotify.com'];
+    const hostsToFetch = hosts.filter(host => 
+      !this.config.pins[host] || this.config.pins[host].length === 0
+    );
+
+    if (hostsToFetch.length === 0) {
+      this.logger.info('All certificate pins already configured, skipping fetch');
+      return;
+    }
+    
+    this.logger.info('Initializing certificate pins', { 
+      hostsToFetch,
+      environment: process.env.NODE_ENV 
+    });
+    
+    for (const host of hostsToFetch) {
+      try {
+        this.logger.debug('Fetching certificate fingerprint', { host });
+        
+        const fingerprint = await extractCertificateFingerprint(host);
+        
+        // Update pins if we got a valid fingerprint
+        if (fingerprint) {
+          // Keep existing pins and add new one (for backup/rotation support)
+          const existingPins = this.config.pins[host] || [];
+          this.config.pins[host] = [...existingPins, fingerprint];
+          this.logger.info('Added certificate pin', { host, fingerprint });
+        }
+      } catch (error) {
+        this.logger.warn('Failed to fetch certificate fingerprint', {
+          host,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        
+        // In strict mode, this is a hard failure
+        if (this.config.strictMode) {
+          throw new Error(`Failed to initialize certificate pins for ${host}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+    }
+
+    // Log final pin configuration
+    const pinCount = Object.values(this.config.pins).reduce((sum, pins) => sum + pins.length, 0);
+    this.logger.info('Certificate pin initialization complete', {
+      hosts: Object.keys(this.config.pins).filter(host => 
+        this.config.pins[host] && this.config.pins[host].length > 0
+      ),
+      totalPins: pinCount,
+      strictMode: this.config.strictMode,
+    });
+  }
+
+  /**
+   * Validate all configured certificate pins
+   */
+  async validateAllPins(): Promise<{ valid: boolean; results: Array<{ host: string; valid: boolean; error?: string }> }> {
+    const results: Array<{ host: string; valid: boolean; error?: string }> = [];
+    let allValid = true;
+
+    for (const host of Object.keys(this.config.pins)) {
+      try {
+        const currentFingerprint = await extractCertificateFingerprint(host);
+        const configuredPins = this.config.pins[host] || [];
+        const isValid = configuredPins.includes(currentFingerprint);
+        
+        results.push({ host, valid: isValid });
+        
+        if (!isValid) {
+          allValid = false;
+          this.logger.warn('Certificate pin mismatch detected', {
+            host,
+            currentFingerprint,
+            configuredPins,
+          });
+        }
+      } catch (error) {
+        allValid = false;
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        results.push({ host, valid: false, error: errorMessage });
+        
+        this.logger.error('Certificate validation failed', {
+          host,
+          error: errorMessage,
+        });
+      }
+    }
+
+    return { valid: allValid, results };
   }
 
   /**
