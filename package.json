@@ -57,9 +57,9 @@
     "win32"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.13.2",
     "axios": "^1.6.0",
-    "dotenv": "^16.3.0",
+    "dotenv": "^17.0.0",
     "open": "^10.1.2",
     "zod": "^3.22.0",
     "dompurify": "^3.2.6"
