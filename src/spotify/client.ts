@@ -50,31 +50,40 @@ export class SpotifyClient implements ISpotifyClient {
   private static readonly MAX_RETRIES = 3;
   private static readonly RETRY_DELAY = 1000; // 1 second base delay
   
-  constructor(authService: AuthService, logger: Logger) {
+  constructor(authService: AuthService, logger: Logger, certificateManager?: CertificateManager) {
     this.authService = authService;
     this.logger = logger;
     this.rateLimiter = new RateLimiter(logger);
     
-    // Initialize certificate manager for enhanced HTTPS security
-    this.certificateManager = createCertificateManager(
+    // Use provided certificate manager or create default one
+    this.certificateManager = certificateManager || createCertificateManager(
       {
-        enabled: false, // Temporarily disable certificate pinning due to TLS compatibility
+        enabled: false, // Will be enabled by security config
         strictMode: false,
         allowDevelopment: true,
       },
       logger
     );
     
-    // Create axios instance with basic security
-    this.axios = axios.create({
+    // Create axios instance with certificate pinning if enabled
+    const axiosConfig: AxiosRequestConfig = {
       baseURL: SpotifyClient.BASE_URL,
       timeout: SpotifyClient.DEFAULT_TIMEOUT,
       headers: {
         'Content-Type': 'application/json',
+        'User-Agent': 'Spotify-MCP-Server/1.0.0',
       },
-      // Use default HTTPS agent without certificate pinning for now
-      // httpsAgent: this.certificateManager.createSecureAgent(),
-    });
+    };
+    
+    // Add HTTPS agent with certificate pinning if enabled
+    if (this.certificateManager.getConfiguration().enabled) {
+      axiosConfig.httpsAgent = this.certificateManager.createSecureAgent();
+      logger.info('Spotify client initialized with certificate pinning');
+    } else {
+      logger.info('Spotify client initialized without certificate pinning');
+    }
+    
+    this.axios = axios.create(axiosConfig);
     
     // Set up request/response interceptors
     this.setupInterceptors();

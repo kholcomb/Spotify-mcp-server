@@ -7,6 +7,7 @@ import { z } from 'zod';
 import type { Logger } from '../types/index.js';
 import { HSMManager, HSMConfigurations, createHSMManager, type HSMAuditEntry } from '../security/hsmManager.js';
 import { RedirectUriValidator, type SecurityConfig } from '../config/security.js';
+import { createScopeManager, type ScopeManager } from '../security/scopeManager.js';
 
 /**
  * OAuth 2.0 authentication manager with PKCE flow for Spotify API
@@ -25,6 +26,7 @@ export class AuthManager {
   private readonly hsmManager: HSMManager;
   private hsmEncryptionKeyId?: string;
   private readonly redirectUriValidator: RedirectUriValidator;
+  private readonly scopeManager: ScopeManager;
   
   private static readonly SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
   private static readonly SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
@@ -42,7 +44,8 @@ export class AuthManager {
     'user-follow-read',
     'streaming'
   ].join(' ');
-
+  // Dynamic scopes based on security tier - will be set by scope manager
+  private readonly dynamicScopes: string;
   constructor(config: AuthConfig, logger: Logger) {
     this.clientId = config.clientId;
     this.clientSecret = config.clientSecret;
@@ -81,6 +84,20 @@ export class AuthManager {
         requireHardwareHSM: process.env.NODE_ENV === 'production' && process.env.REQUIRE_HARDWARE_HSM === 'true',
       }
     );
+    
+    // Initialize scope manager with appropriate tier
+    const scopeTier = process.env.OAUTH_SCOPE_TIER as 'read-only' | 'limited' | 'full-access' || 
+                     (environment === 'production' ? 'read-only' : 'limited');
+    
+    this.scopeManager = createScopeManager(scopeTier, logger);
+    this.dynamicScopes = this.scopeManager.getScopeString();
+    
+    // Log scope configuration
+    logger.info('OAuth scope configuration initialized', {
+      tier: scopeTier,
+      scopes: this.dynamicScopes,
+      environment,
+    });
     
     this.ensureTokenDirectory();
     this.initializeHSM().catch(err => {
@@ -188,7 +205,7 @@ export class AuthManager {
       code_challenge_method: 'S256',
       code_challenge: codeChallenge,
       state,
-      scope: AuthManager.SCOPES,
+      scope: this.dynamicScopes,
       show_dialog: 'true'
     });
     
@@ -246,7 +263,7 @@ export class AuthManager {
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token || '',
         expiresAt: new Date(Date.now() + (tokens.expires_in * 1000)),
-        scope: tokens.scope || AuthManager.SCOPES,
+        scope: tokens.scope || this.dynamicScopes,
         tokenType: tokens.token_type || 'Bearer'
       };
       
@@ -466,6 +483,37 @@ export class AuthManager {
     } catch {
       return false;
     }
+  }
+  
+  /**
+   * Get scope manager for tool validation
+   */
+  getScopeManager(): ScopeManager {
+    return this.scopeManager;
+  }
+  
+  /**
+   * Validate OAuth scopes for current configuration
+   */
+  validateCurrentScopes(requestedScopes: string[]): {
+    valid: boolean;
+    issues?: string[];
+    recommendations?: string[];
+  } {
+    const validation = this.scopeManager.validateScopeConfiguration(requestedScopes);
+    
+    return {
+      valid: validation.valid,
+      issues: [...validation.missingScopes, ...validation.excessiveScopes],
+      recommendations: validation.recommendations,
+    };
+  }
+  
+  /**
+   * Get security recommendations for current scope configuration
+   */
+  getSecurityRecommendations(): string[] {
+    return this.scopeManager.getSecurityRecommendations();
   }
 
   // Private helper methods

@@ -272,3 +272,4 @@ release-temp/
 spotify-mcp-dxt/
 *.dxt
 manifest.json
+build-dxt.sh

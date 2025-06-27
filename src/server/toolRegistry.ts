@@ -91,6 +91,74 @@ export class ToolRegistry {
     
     // For Zod schemas, return a basic object schema
     // This ensures MCP compatibility while avoiding complex type introspection
+
+    // If it's a Zod schema, parse its shape
+    if (schemaObj._def) {
+      const zodDef = schemaObj._def as Record<string, unknown>;
+      const result: Record<string, unknown> = {
+        type: 'object',
+        properties: {},
+        required: []
+      };
+      
+      // Handle ZodObject shape
+      if (zodDef.typeName === 'ZodObject' && zodDef.shape) {
+        const shape = typeof zodDef.shape === 'function' ? zodDef.shape() : zodDef.shape;
+        for (const [key, value] of Object.entries(shape)) {
+          const fieldDef = (value as Record<string, unknown>)._def as Record<string, unknown>;
+          
+          // Determine the JSON Schema type
+          let fieldSchema: Record<string, unknown> = { type: 'string' }; // default
+          
+          if (fieldDef.typeName === 'ZodString') {
+            fieldSchema = { type: 'string' };
+          } else if (fieldDef.typeName === 'ZodNumber') {
+            fieldSchema = { type: 'number' };
+          } else if (fieldDef.typeName === 'ZodBoolean') {
+            fieldSchema = { type: 'boolean' };
+          } else if (fieldDef.typeName === 'ZodArray') {
+            fieldSchema = { type: 'array', items: { type: 'string' } };
+          } else if (fieldDef.typeName === 'ZodEnum') {
+            fieldSchema = { type: 'string', enum: fieldDef.values };
+          } else if (fieldDef.typeName === 'ZodOptional') {
+            // Handle optional fields
+            const innerDef = (fieldDef.innerType as Record<string, unknown>)?._def as Record<string, unknown>;
+            if (innerDef?.typeName === 'ZodString') {
+              fieldSchema = { type: 'string' };
+            } else if (innerDef?.typeName === 'ZodNumber') {
+              fieldSchema = { type: 'number' };
+            } else if (innerDef?.typeName === 'ZodBoolean') {
+              fieldSchema = { type: 'boolean' };
+            } else if (innerDef?.typeName === 'ZodArray') {
+              fieldSchema = { type: 'array', items: { type: 'string' } };
+            } else if (innerDef?.typeName === 'ZodEnum') {
+              fieldSchema = { type: 'string', enum: innerDef.values };
+            }
+          }
+          
+          // Add description if available
+          if (fieldDef.description) {
+            fieldSchema.description = fieldDef.description;
+          }
+          
+          (result.properties as Record<string, unknown>)[key] = fieldSchema;
+          
+          // Mark as required if not optional
+          if (fieldDef.typeName !== 'ZodOptional') {
+            (result.required as string[]).push(key);
+          }
+        }
+      }
+      
+      // Add schema description if available
+      if (zodDef.description) {
+        result.description = zodDef.description;
+      }
+      
+      return result;
+    }
+    
+    // Default fallback
     return {
       type: 'object',
       properties: {},

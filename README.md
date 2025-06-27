@@ -17,7 +17,7 @@ Control Spotify with natural language through Claude Desktop! This Model Context
 - 📱 **Multi-Device Support**: Control any of your Spotify-connected devices
 - 🔐 **Secure Authentication**: OAuth 2.0 + PKCE flow with encrypted token storage
 - ⚡ **Real-time Updates**: Get current playback status and queue information
-- 🛡️ **Enterprise Ready**: Optional HSM support, certificate pinning, audit logging
+- 🛡️ **Enterprise Ready**: Advanced security framework with HSM support, certificate pinning, comprehensive audit logging
 
 ## 🚀 Quick Start
 
@@ -192,11 +192,12 @@ npm run test:integration
 - [📖 Installation Guide](./INSTALLATION_GUIDE.md) - Step-by-step setup
 - [🛠️ API Documentation](./docs/) - Technical reference
 - [🔒 Security Guide](./docs/REDIRECT_URI_SECURITY.md) - Security implementation
-- [🧪 Testing Guide](./docs/TESTING.md) - Testing procedures
+- [🛡️ Security Architecture](./docs/api/SECURITY_ARCHITECTURE.md) - Advanced security features
+- [🧪 Testing Guide](./docs/developer/testing.md) - Testing procedures
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](./docs/CONTRIBUTING.md).
+We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md).
 
 1. Fork the repository
 2. Create a feature branch
