@@ -15,7 +15,15 @@ import type {
   DevicesResponse,
   RecommendationsResponse,
   PlaylistTracksResponse,
-  AlbumTracksResponse
+  AlbumTracksResponse,
+  TopItemsOptions,
+  TopTracksResponse,
+  TopArtistsResponse,
+  AudioFeatures,
+  SavedTracksResponse,
+  SavedAlbumsResponse,
+  FollowedArtistsOptions,
+  FollowedArtistsResponse
 } from '../types/index.js';
 import type { AuthService } from '../auth/index.js';
 import { RateLimiter } from './rateLimiter.js';
@@ -361,6 +369,101 @@ export class SpotifyClient implements ISpotifyClient {
       method: 'GET',
       url: `/albums/${albumId}/tracks`,
       params: options,
+    });
+    
+    return response;
+  }
+
+  /**
+   * Get user's top tracks
+   */
+  async getUserTopTracks(options?: TopItemsOptions): Promise<TopTracksResponse> {
+    const response = await this.request<TopTracksResponse>({
+      method: 'GET',
+      url: '/me/top/tracks',
+      params: {
+        time_range: options?.time_range || 'medium_term',
+        limit: options?.limit || 20,
+        offset: options?.offset || 0,
+      },
+    });
+    
+    return response;
+  }
+
+  /**
+   * Get user's top artists
+   */
+  async getUserTopArtists(options?: TopItemsOptions): Promise<TopArtistsResponse> {
+    const response = await this.request<TopArtistsResponse>({
+      method: 'GET',
+      url: '/me/top/artists',
+      params: {
+        time_range: options?.time_range || 'medium_term',
+        limit: options?.limit || 20,
+        offset: options?.offset || 0,
+      },
+    });
+    
+    return response;
+  }
+
+  /**
+   * Get audio features for a track
+   */
+  async getAudioFeatures(trackId: string): Promise<AudioFeatures> {
+    const response = await this.request<AudioFeatures>({
+      method: 'GET',
+      url: `/audio-features/${trackId}`,
+    });
+    
+    return response;
+  }
+
+  /**
+   * Get user's saved tracks
+   */
+  async getUserSavedTracks(options?: PaginationOptions): Promise<SavedTracksResponse> {
+    const response = await this.request<SavedTracksResponse>({
+      method: 'GET',
+      url: '/me/tracks',
+      params: {
+        limit: options?.limit || 20,
+        offset: options?.offset || 0,
+      },
+    });
+    
+    return response;
+  }
+
+  /**
+   * Get user's saved albums
+   */
+  async getUserSavedAlbums(options?: PaginationOptions): Promise<SavedAlbumsResponse> {
+    const response = await this.request<SavedAlbumsResponse>({
+      method: 'GET',
+      url: '/me/albums',
+      params: {
+        limit: options?.limit || 20,
+        offset: options?.offset || 0,
+      },
+    });
+    
+    return response;
+  }
+
+  /**
+   * Get user's followed artists
+   */
+  async getUserFollowedArtists(options?: FollowedArtistsOptions): Promise<FollowedArtistsResponse> {
+    const response = await this.request<FollowedArtistsResponse>({
+      method: 'GET',
+      url: '/me/following',
+      params: {
+        type: 'artist',
+        limit: options?.limit || 20,
+        after: options?.after,
+      },
     });
     
     return response;
