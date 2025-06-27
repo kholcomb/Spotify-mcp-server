@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import DOMPurify from 'dompurify';
 import type { Logger } from '../types/index.js';
 
 export interface SanitizationConfig {
@@ -37,7 +38,7 @@ export class InputSanitizer {
     sqlInjection: /(\b(union|select|insert|update|delete|drop|create|alter|exec|execute)\b)|(-{2})|\/\*|\*\/|;/gi,
     
     // XSS patterns
-    xss: /<script[^>]*>.*?<\/script>|javascript:|on\w+\s*=|<iframe|<object|<embed|<link|<meta/gi,
+    xss: (input: string) => DOMPurify.sanitize(input),
     
     // Command injection patterns
     commandInjection: /[;&|`$(){}[\]\\]/g,
