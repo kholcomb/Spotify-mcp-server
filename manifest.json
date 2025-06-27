@@ -1,0 +1,43 @@
+{
+  "name": "spotify-mcp-server",
+  "version": "1.0.0",
+  "description": "Control Spotify through natural language with AI assistants. Features include playback control, search, queue management, and music analytics.",
+  "author": "kholcomb",
+  "license": "MIT",
+  "homepage": "https://github.com/kholcomb/Spotify-mcp-server",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kholcomb/Spotify-mcp-server.git"
+  },
+  "user_config": {
+    "SPOTIFY_CLIENT_ID": {
+      "type": "string",
+      "title": "Spotify Client ID",
+      "description": "Your Spotify app client ID from developer.spotify.com/documentation/general/guides/authorization/app-settings/",
+      "required": true
+    },
+    "SPOTIFY_CLIENT_SECRET": {
+      "type": "string",
+      "title": "Spotify Client Secret", 
+      "description": "Your Spotify app client secret from developer.spotify.com/documentation/general/guides/authorization/app-settings/",
+      "required": true
+    },
+    "SPOTIFY_REDIRECT_URI": {
+      "type": "string",
+      "title": "Spotify Redirect URI",
+      "description": "OAuth callback URI - must match your Spotify app settings (default: http://localhost:6178/callback)",
+      "default": "http://localhost:6178/callback",
+      "required": false
+    }
+  },
+  "mcp_config": {
+    "transport": "stdio",
+    "command": "node",
+    "args": ["${__dirname}/server/index.js"],
+    "env": {
+      "SPOTIFY_CLIENT_ID": "${user_config.SPOTIFY_CLIENT_ID}",
+      "SPOTIFY_CLIENT_SECRET": "${user_config.SPOTIFY_CLIENT_SECRET}",
+      "SPOTIFY_REDIRECT_URI": "${user_config.SPOTIFY_REDIRECT_URI}"
+    }
+  }
+}

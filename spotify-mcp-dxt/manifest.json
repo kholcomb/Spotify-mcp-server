@@ -1,0 +1,81 @@
+{
+  "dxt_version": "0.1",
+  "name": "spotify-mcp-server",
+  "version": "1.0.1",
+  "description": "A Model Context Protocol server for Spotify Web API integration",
+  "author": {
+    "name": "kholcomb",
+    "url": "https://github.com/kholcomb"
+  },
+  "homepage": "https://github.com/kholcomb/Spotify-mcp-server",
+  "documentation": "https://github.com/kholcomb/Spotify-mcp-server#readme",
+  "support": "https://github.com/kholcomb/Spotify-mcp-server/issues",
+  "server": {
+    "type": "node",
+    "entry_point": "index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/index.js"
+      ],
+      "env": {
+        "SPOTIFY_CLIENT_ID": "${user_config.SPOTIFY_CLIENT_ID}",
+        "SPOTIFY_CLIENT_SECRET": "${user_config.SPOTIFY_CLIENT_SECRET}",
+        "SPOTIFY_REDIRECT_URI": "${user_config.SPOTIFY_REDIRECT_URI}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "authenticate",
+      "description": "Authenticate with Spotify"
+    },
+    {
+      "name": "play",
+      "description": "Start or resume playback"
+    },
+    {
+      "name": "skip_next",
+      "description": "Skip to the next track"
+    },
+    {
+      "name": "set_volume",
+      "description": "Set playback volume"
+    },
+    {
+      "name": "search",
+      "description": "Search Spotify Catalog"
+    }
+  ],
+  "user_config": {
+    "SPOTIFY_CLIENT_ID": {
+      "type": "string",
+      "title": "Spotify Client ID",
+      "description": "Your Spotify app client ID. Create a Spotify app at https://developer.spotify.com/dashboard and copy the Client ID.",
+      "required": true,
+      "sensitive": true
+    },
+    "SPOTIFY_CLIENT_SECRET": {
+      "type": "string",
+      "title": "Spotify Client Secret",
+      "description": "Your Spotify app client secret. Found in your Spotify app settings at https://developer.spotify.com/dashboard",
+      "required": true,
+      "sensitive": true
+    },
+    "SPOTIFY_REDIRECT_URI": {
+      "type": "string",
+      "title": "Spotify Redirect URI",
+      "description": "OAuth callback URI that must match your Spotify app settings. Default works for most setups.",
+      "required": false,
+      "default": "http://127.0.0.1:8080/callback"
+    }
+  },
+  "keywords": [
+    "spotify"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kholcomb/Spotify-mcp-server"
+  }
+}
