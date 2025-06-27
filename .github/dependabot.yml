@@ -23,7 +23,6 @@ updates:
     labels:
       - "dependencies"
       - "automated"
-    milestone: 1
     target-branch: "main"
     
     # Group updates for better management
@@ -68,9 +67,6 @@ updates:
       
     # Rebase strategy for PR management
     rebase-strategy: "auto"
-    
-    # Vendor dependencies for security scanning
-    vendor: true
 
   # Monitor GitHub Actions
   - package-ecosystem: "github-actions"
