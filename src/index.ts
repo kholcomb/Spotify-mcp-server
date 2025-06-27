@@ -13,20 +13,26 @@ import { MCPServer } from './server/index.js';
 
 // Load environment variables only if not in DXT context
 // DXT runtime provides environment variables directly
-if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
-  const { config } = await import('dotenv');
-  config();
+// Check for DXT context by looking for DXT-specific environment or working directory patterns
+const isDXTContext = process.cwd().includes('Claude Extensions') || 
+                     process.argv[1]?.includes('Claude Extensions') ||
+                     process.env.DXT_RUNTIME === 'true' ||
+                     process.argv[0]?.includes('Claude');
+
+
+if (!isDXTContext) {
+  try {
+    const { config } = await import('dotenv');
+    config();
+  } catch (error) {
+    // Silently ignore dotenv import errors in DXT context
+  }
 }
 
 async function main(): Promise<void> {
   let mcpServer: MCPServer | null = null;
   
   try {
-    // Debug environment variables (to stderr, won't interfere with MCP)
-    console.error('DEBUG: Environment variables check:');
-    console.error('SPOTIFY_CLIENT_ID present:', !!process.env.SPOTIFY_CLIENT_ID);
-    console.error('SPOTIFY_CLIENT_SECRET present:', !!process.env.SPOTIFY_CLIENT_SECRET);
-    console.error('SPOTIFY_REDIRECT_URI:', process.env.SPOTIFY_REDIRECT_URI || 'not set');
     
     // Initialize logger
     const logger = new SimpleLogger(process.env.LOG_LEVEL as 'debug' | 'info' | 'warn' | 'error' || 'info');
@@ -39,7 +45,6 @@ async function main(): Promise<void> {
 
     logger.info('Configuration loaded successfully', {
       logLevel: serverConfig.logLevel,
-      redirectUri: serverConfig.spotify.redirectUri,
     });
 
     // Initialize and start MCP server
