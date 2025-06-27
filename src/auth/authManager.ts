@@ -30,9 +30,22 @@ export class AuthManager {
   
   private static readonly SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
   private static readonly SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
+  private static readonly SCOPES = [
+    'user-read-playback-state',
+    'user-modify-playback-state',
+    'user-read-currently-playing',
+    'user-read-recently-played',
+    'user-read-email',
+    'user-read-private',
+    'playlist-read-private',
+    'playlist-read-collaborative',
+    'user-library-read',
+    'user-top-read',
+    'user-follow-read',
+    'streaming'
+  ].join(' ');
   // Dynamic scopes based on security tier - will be set by scope manager
   private readonly dynamicScopes: string;
-
   constructor(config: AuthConfig, logger: Logger) {
     this.clientId = config.clientId;
     this.clientSecret = config.clientSecret;

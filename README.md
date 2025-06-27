@@ -90,7 +90,7 @@ Once set up, use natural language with Claude:
 ### Core Components
 
 - **🔐 Authentication**: Secure OAuth 2.0 + PKCE flow
-- **🛠️ Tool Registry**: 26 specialized tools for Spotify operations
+- **🛠️ Tool Registry**: 27 specialized tools for Spotify operations
 - **🔄 Request Handler**: Intelligent request routing and validation
 - **📊 Rate Limiter**: Automatic rate limiting and retry logic
 - **🛡️ Security Layer**: Certificate pinning, HSM support, encrypted storage
