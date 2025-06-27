@@ -78,6 +78,13 @@ export class ClientAuthenticator {
   }
 
   /**
+   * Get current configuration (for testing and monitoring)
+   */
+  getConfiguration(): ClientAuthConfig {
+    return { ...this.config };
+  }
+
+  /**
    * Authenticate a client request
    */
   async authenticateRequest(request: ClientRequest): Promise<{ 
@@ -156,8 +163,8 @@ export class ClientAuthenticator {
 
     return {
       authenticated: true,
-      clientId: tokenValidation.clientId,
-      scopes: tokenValidation.scopes,
+      clientId: tokenValidation.clientId || undefined,
+      scopes: tokenValidation.scopes || undefined,
     };
   }
 
@@ -253,7 +260,7 @@ export class ClientAuthenticator {
       name: client.name,
       scopes: client.scopes,
       created: client.created,
-      lastUsed: client.lastUsed,
+      lastUsed: client.lastUsed || undefined,
     }));
   }
 
@@ -348,12 +355,27 @@ export class ClientAuthenticator {
   }
 
   private generateAuthToken(): string {
-    const timestamp = Date.now().toString();
-    const random = randomBytes(24).toString('hex');
-    const payload = `${timestamp}.${random}`;
+    // Require secure token secret - no fallback allowed
+    const secret = process.env.MCP_TOKEN_SECRET;
+    if (!secret) {
+      throw new Error('MCP_TOKEN_SECRET environment variable is required for secure token generation');
+    }
     
-    // Sign the token with HMAC
-    const secret = process.env.MCP_TOKEN_SECRET || 'default-secret-change-in-production';
+    if (secret === 'default-secret-change-in-production') {
+      throw new Error('Default MCP_TOKEN_SECRET detected - please use a secure random secret');
+    }
+    
+    if (secret.length < 32) {
+      throw new Error('MCP_TOKEN_SECRET must be at least 32 characters for security');
+    }
+    
+    // Generate token with enhanced entropy
+    const timestamp = Date.now().toString();
+    const random = randomBytes(32).toString('hex'); // Increased from 24 to 32 bytes
+    const nonce = randomBytes(8).toString('hex'); // Additional entropy
+    const payload = `${timestamp}.${random}.${nonce}`;
+    
+    // Sign the token with HMAC-SHA256
     const signature = createHmac('sha256', secret).update(payload).digest('hex');
     
     return `${payload}.${signature}`;

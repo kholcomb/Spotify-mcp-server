@@ -136,8 +136,8 @@ export class EnhancedRateLimiter {
     } else if (userTracker.isBlocked && userTracker.blockExpiresAt && userTracker.blockExpiresAt <= now) {
       // Unblock user
       userTracker.isBlocked = false;
-      userTracker.blockExpiresAt = undefined;
-      this.logger.info('User unblocked after abuse timeout', { userId });
+      delete userTracker.blockExpiresAt;
+      this.logger.info('User unblocked after abuse timeout', { userId: this.maskUserId(userId) });
     }
 
     // Check global concurrent requests
@@ -192,8 +192,8 @@ export class EnhancedRateLimiter {
     const record: RequestRecord = {
       timestamp: now,
       success,
-      toolName,
-      userId,
+      ...(toolName && { toolName }),
+      ...(userId && { userId }),
     };
 
     // Update concurrent request counter
@@ -236,10 +236,10 @@ export class EnhancedRateLimiter {
     }
 
     this.logger.debug('Request recorded', {
-      userId,
+      userId: this.maskUserId(userId),
       success,
       toolName,
-      clientId,
+      clientId: clientId ? this.maskClientId(clientId) : undefined,
       totalRequests: userTracker.totalRequests,
     });
   }
@@ -271,7 +271,7 @@ export class EnhancedRateLimiter {
       requestsLastDay: tracker.requests.filter(r => r.timestamp > oneDayAgo).length,
       failuresLastMinute: tracker.failures.filter(r => r.timestamp > oneMinuteAgo).length,
       isBlocked: tracker.isBlocked,
-      blockExpiresAt: tracker.blockExpiresAt ? new Date(tracker.blockExpiresAt) : undefined,
+      ...(tracker.blockExpiresAt && { blockExpiresAt: new Date(tracker.blockExpiresAt) }),
       totalRequests: tracker.totalRequests,
       firstRequestAt: new Date(tracker.firstRequestAt),
       lastRequestAt: new Date(tracker.lastRequestAt),
@@ -314,9 +314,9 @@ export class EnhancedRateLimiter {
       tracker.requests = [];
       tracker.failures = [];
       tracker.isBlocked = false;
-      tracker.blockExpiresAt = undefined;
+      delete tracker.blockExpiresAt;
       
-      this.logger.info('User rate limits reset', { userId });
+      this.logger.info('User rate limits reset', { userId: this.maskUserId(userId) });
     }
   }
 
@@ -329,7 +329,7 @@ export class EnhancedRateLimiter {
     tracker.blockExpiresAt = Date.now() + durationMs;
     
     this.logger.warn('User manually blocked', {
-      userId,
+      userId: this.maskUserId(userId),
       durationMs,
       reason,
       expiresAt: new Date(tracker.blockExpiresAt).toISOString(),
@@ -479,7 +479,7 @@ export class EnhancedRateLimiter {
       tracker.blockExpiresAt = now + this.config.abuseProtection.blockDurationMs;
 
       this.logger.warn('User blocked for abuse', {
-        userId,
+        userId: this.maskUserId(userId),
         failuresInLastMinute: recentFailures.length,
         blockDurationMs: this.config.abuseProtection.blockDurationMs,
         expiresAt: new Date(tracker.blockExpiresAt).toISOString(),
@@ -586,6 +586,26 @@ export class EnhancedRateLimiter {
         toolTrackers: this.toolRequests.size,
       });
     }, 300000); // 5 minutes
+  }
+
+  /**
+   * Mask user ID for privacy in logs (show only first/last 3 chars)
+   */
+  private maskUserId(userId: string): string {
+    if (userId.length <= 6) {
+      return '*'.repeat(userId.length);
+    }
+    return `${userId.substring(0, 3)}***${userId.substring(userId.length - 3)}`;
+  }
+
+  /**
+   * Mask client ID for privacy in logs (show only first 4 chars)
+   */
+  private maskClientId(clientId: string): string {
+    if (clientId.length <= 8) {
+      return '*'.repeat(clientId.length);
+    }
+    return `${clientId.substring(0, 4)}***`;
   }
 }
 

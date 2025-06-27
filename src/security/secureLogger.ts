@@ -96,6 +96,7 @@ export class SecureLogger implements Logger {
       maskSensitiveData: this.config.maskSensitiveData,
       enableSecurityAudit: this.config.enableSecurityAudit,
       sensitiveFieldCount: this.config.sensitiveFields.length,
+      maskingPatternCount: Object.keys(this.config.maskingPatterns).length,
     });
   }
 
@@ -277,16 +278,15 @@ export class SecureLogger implements Logger {
     for (const [name, pattern] of Object.entries(this.config.maskingPatterns)) {
       masked = masked.replace(pattern, (match) => {
         if (name === 'email') {
-          const parts = match.split('@');
-          return `${parts[0]?.substring(0, 2)}***@${parts[1]}`;
+          return '***@***.***';
         } else if (name === 'spotifyId') {
           return match.replace(/([a-zA-Z0-9]{22})/, '***[SPOTIFY_ID]***');
         } else if (name === 'creditCard') {
-          return `****-****-****-${  match.slice(-4)}`;
+          return '****-****-****-****';
         } else if (name === 'phone') {
-          return `***-***-${  match.slice(-4)}`;
+          return '***-***-****';
         } else if (name === 'ssn') {
-          return `***-**-${  match.slice(-4)}`;
+          return '***-**-****';
         } else {
           // Generic masking for tokens and secrets
           if (match.length <= 8) {
@@ -322,12 +322,9 @@ export class SecureLogger implements Logger {
     if (typeof value === 'string') {
       if (value.length === 0) {
         return '[empty]';
-      } else if (value.length <= 3) {
-        return '***';
-      } else if (value.length <= 10) {
-        return `${value.charAt(0)  }***${  value.slice(-1)}`;
       } else {
-        return `${value.substring(0, 2)  }***[REDACTED]***${  value.slice(-2)}`;
+        // Return asterisks for sensitive field values
+        return '*'.repeat(Math.min(value.length, 10));
       }
     }
 

@@ -124,23 +124,28 @@ const ENVIRONMENT_CONFIGS: Record<SecurityEnvironment, Partial<SecuritySettings>
       maxStringLength: 2000,
       maxArrayLength: 200,
       strictMode: false,
+      allowedCharacterSets: ['alphanumeric', 'basic-punctuation'],
+      blockedPatterns: [/<script/gi, /javascript:/gi, /data:/gi, /vbscript:/gi],
     },
     certificatePinning: {
       enabled: false,
       strictMode: false,
       allowDevelopment: true,
+      pins: [],
     },
     logging: {
       maskSensitiveData: false, // Allow full logging in development
       enableSecurityAudit: true,
       maxLogFieldLength: 1000,
       allowedLogLevels: ['debug', 'info', 'warn', 'error'],
+      sensitiveFields: ['password', 'token', 'key', 'secret'],
+      maskingPatterns: { default: /\*\*\*MASKED\*\*\*/ },
     },
     rateLimiting: {
       userLimits: {
-        requestsPerMinute: 120,
-        requestsPerHour: 2000,
-        requestsPerDay: 20000,
+        requestsPerMinute: 30,
+        requestsPerHour: 1800,
+        requestsPerDay: 43200,
       },
       globalLimits: {
         requestsPerMinute: 800,
@@ -151,6 +156,11 @@ const ENVIRONMENT_CONFIGS: Record<SecurityEnvironment, Partial<SecuritySettings>
         maxFailuresPerMinute: 20,
         blockDurationMs: 120000, // 2 minutes
         enableCircuitBreaker: false,
+      },
+      toolLimits: {
+        search: { requestsPerMinute: 30 },
+        playback: { requestsPerMinute: 60 },
+        library: { requestsPerMinute: 40 },
       },
     },
     oauthScopes: {
@@ -185,23 +195,28 @@ const ENVIRONMENT_CONFIGS: Record<SecurityEnvironment, Partial<SecuritySettings>
       maxStringLength: 1000,
       maxArrayLength: 100,
       strictMode: true,
+      allowedCharacterSets: ['alphanumeric', 'basic-punctuation'],
+      blockedPatterns: [/<script/gi, /javascript:/gi, /data:/gi, /vbscript:/gi],
     },
     certificatePinning: {
       enabled: true,
       strictMode: false,
       allowDevelopment: false,
+      pins: ['sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='],
     },
     logging: {
       maskSensitiveData: true,
       enableSecurityAudit: true,
       maxLogFieldLength: 500,
       allowedLogLevels: ['info', 'warn', 'error'],
+      sensitiveFields: ['password', 'token', 'key', 'secret'],
+      maskingPatterns: { default: /\*\*\*MASKED\*\*\*/ },
     },
     rateLimiting: {
       userLimits: {
-        requestsPerMinute: 80,
+        requestsPerMinute: 25,
         requestsPerHour: 1500,
-        requestsPerDay: 15000,
+        requestsPerDay: 36000,
       },
       globalLimits: {
         requestsPerMinute: 600,
@@ -212,6 +227,11 @@ const ENVIRONMENT_CONFIGS: Record<SecurityEnvironment, Partial<SecuritySettings>
         maxFailuresPerMinute: 15,
         blockDurationMs: 300000, // 5 minutes
         enableCircuitBreaker: true,
+      },
+      toolLimits: {
+        search: { requestsPerMinute: 20 },
+        playback: { requestsPerMinute: 40 },
+        library: { requestsPerMinute: 30 },
       },
     },
     oauthScopes: {
@@ -246,23 +266,28 @@ const ENVIRONMENT_CONFIGS: Record<SecurityEnvironment, Partial<SecuritySettings>
       maxStringLength: 500,
       maxArrayLength: 50,
       strictMode: true,
+      allowedCharacterSets: ['alphanumeric'],
+      blockedPatterns: [/<script/gi, /javascript:/gi, /data:/gi, /vbscript:/gi, /eval\(/gi],
     },
     certificatePinning: {
       enabled: true,
       strictMode: true,
       allowDevelopment: false,
+      pins: ['sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=', 'sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB='],
     },
     logging: {
       maskSensitiveData: true,
       enableSecurityAudit: true,
       maxLogFieldLength: 300,
       allowedLogLevels: ['warn', 'error'], // Minimal logging in production
+      sensitiveFields: ['password', 'token', 'key', 'secret', 'auth'],
+      maskingPatterns: { default: /\*\*\*MASKED\*\*\*/ },
     },
     rateLimiting: {
       userLimits: {
-        requestsPerMinute: 60,
-        requestsPerHour: 1000,
-        requestsPerDay: 10000,
+        requestsPerMinute: 16,
+        requestsPerHour: 960,
+        requestsPerDay: 23040,
       },
       globalLimits: {
         requestsPerMinute: 500,
@@ -273,6 +298,11 @@ const ENVIRONMENT_CONFIGS: Record<SecurityEnvironment, Partial<SecuritySettings>
         maxFailuresPerMinute: 10,
         blockDurationMs: 600000, // 10 minutes
         enableCircuitBreaker: true,
+      },
+      toolLimits: {
+        search: { requestsPerMinute: 15 },
+        playback: { requestsPerMinute: 30 },
+        library: { requestsPerMinute: 20 },
       },
     },
     oauthScopes: {
@@ -518,12 +548,94 @@ export class SecurityConfigManager {
   private validateConfig(): void {
     try {
       SecuritySettingsSchema.parse(this.config);
+      
+      // Additional business logic validations
+      this.validateBusinessRules();
     } catch (error) {
       if (error instanceof z.ZodError) {
         const issues = error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`);
         throw new Error(`Security configuration validation failed:\n${issues.join('\n')}`);
       }
       throw error;
+    }
+  }
+
+  private validateBusinessRules(): void {
+    const errors: string[] = [];
+
+    // Validate environment-specific requirements
+    if (this.config.environment === 'production') {
+      if (!this.config.clientAuth.requireAuth) {
+        errors.push('Production environment must require authentication');
+      }
+      
+      if (!this.config.certificatePinning.enabled) {
+        errors.push('Production environment must enable certificate pinning');
+      }
+      
+      if (!this.config.logging.maskSensitiveData) {
+        errors.push('Production environment must enable sensitive data masking');
+      }
+      
+      if (this.config.oauthScopes.tier === 'full-access') {
+        errors.push('Production environment should not use full-access OAuth scope tier');
+      }
+      
+      if (this.config.clientAuth.allowedOrigins.includes('*')) {
+        errors.push('Production environment should not allow all origins');
+      }
+    }
+
+    // Validate rate limiting consistency
+    if (this.config.rateLimiting.userLimits.requestsPerMinute * 60 > this.config.rateLimiting.userLimits.requestsPerHour) {
+      errors.push('Per-minute rate limit would exceed hourly limit');
+    }
+    
+    if (this.config.rateLimiting.userLimits.requestsPerHour * 24 > this.config.rateLimiting.userLimits.requestsPerDay) {
+      errors.push('Per-hour rate limit would exceed daily limit');
+    }
+
+    // Validate global vs user limits
+    if (this.config.rateLimiting.globalLimits.requestsPerMinute < this.config.rateLimiting.userLimits.requestsPerMinute) {
+      errors.push('Global rate limit should be higher than per-user limit');
+    }
+
+    // Validate authentication token lifetime
+    if (this.config.environment === 'production' && this.config.clientAuth.tokenLifetime > 3600000) {
+      errors.push('Production environment should use token lifetime ≤ 1 hour');
+    }
+
+    // Validate encryption settings
+    if (this.config.encryption.keyRotationDays < 1) {
+      errors.push('Key rotation period must be at least 1 day');
+    }
+
+    if (this.config.environment === 'production' && this.config.encryption.keyRotationDays > 90) {
+      errors.push('Production environment should rotate keys every 90 days or less');
+    }
+
+    // Validate abuse protection
+    if (this.config.rateLimiting.abuseProtection.enabled) {
+      if (this.config.rateLimiting.abuseProtection.blockDurationMs < 60000) {
+        errors.push('Abuse protection block duration must be at least 1 minute');
+      }
+      
+      if (this.config.rateLimiting.abuseProtection.maxFailuresPerMinute < 3) {
+        errors.push('Abuse protection threshold must allow at least 3 failures per minute');
+      }
+    }
+
+    // Validate input sanitization
+    if (this.config.inputSanitization.maxStringLength < 100) {
+      errors.push('Input sanitization max string length must be at least 100 characters');
+    }
+
+    if (this.config.inputSanitization.maxArrayLength < 10) {
+      errors.push('Input sanitization max array length must be at least 10 items');
+    }
+
+    if (errors.length > 0) {
+      throw new Error(`Security configuration business rule validation failed:\n${errors.join('\n')}`);
     }
   }
 

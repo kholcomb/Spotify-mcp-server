@@ -146,8 +146,8 @@ export class InputSanitizer {
 
     return {
       valid: true,
-      type: uriMatch[1],
-      id: uriMatch[2],
+      type: uriMatch[1] as string,
+      id: uriMatch[2] as string,
     };
   }
 
@@ -243,7 +243,7 @@ export class InputSanitizer {
     }
 
     if (typeof value === 'object') {
-      return this.sanitizeObject(value, context, warnings);
+      return this.sanitizeObject(value as Record<string, unknown>, context, warnings);
     }
 
     throw new Error(`Unsupported input type: ${typeof value}`);
@@ -305,12 +305,15 @@ export class InputSanitizer {
 
   private hasSecurityPatterns(str: string): boolean {
     for (const pattern of Object.values(this.securityPatterns)) {
+      // Reset regex state to avoid false positives from global flags
+      pattern.lastIndex = 0;
       if (pattern.test(str)) {
         return true;
       }
     }
 
     for (const pattern of this.config.blockedPatterns) {
+      pattern.lastIndex = 0;
       if (pattern.test(str)) {
         return true;
       }
@@ -323,10 +326,13 @@ export class InputSanitizer {
     let sanitized = str;
 
     for (const pattern of Object.values(this.securityPatterns)) {
+      // Reset regex state and use replace with global flag
+      pattern.lastIndex = 0;
       sanitized = sanitized.replace(pattern, '');
     }
 
     for (const pattern of this.config.blockedPatterns) {
+      pattern.lastIndex = 0;
       sanitized = sanitized.replace(pattern, '');
     }
 
