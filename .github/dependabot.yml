@@ -23,7 +23,7 @@ updates:
     labels:
       - "dependencies"
       - "automated"
-    target-branch: "main"
+    target-branch: "development"
     
     # Group updates for better management
     groups:
@@ -86,6 +86,7 @@ updates:
       - "github-actions"
       - "ci-cd"
       - "automated"
+    target-branch: "development"
 
   # Monitor Docker dependencies
   - package-ecosystem: "docker"
@@ -107,3 +108,4 @@ updates:
       - "docker"
       - "infrastructure"
       - "automated"
+    target-branch: "development"
