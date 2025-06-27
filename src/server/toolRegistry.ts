@@ -79,6 +79,7 @@ export class ToolRegistry {
 
   /**
    * Convert Zod schema to JSON Schema format for MCP compatibility
+   * For now, we return a simple object schema since complex Zod parsing is error-prone
    */
   private convertToJsonSchema(schema: object): object {
     const schemaObj = schema as Record<string, unknown>;
@@ -88,76 +89,12 @@ export class ToolRegistry {
       return schema;
     }
     
-    // If it's a Zod schema, parse its shape
-    if (schemaObj._def) {
-      const zodDef = schemaObj._def as any;
-      const result: any = {
-        type: 'object',
-        properties: {},
-        required: []
-      };
-      
-      // Handle ZodObject shape
-      if (zodDef.typeName === 'ZodObject' && zodDef.shape) {
-        const shape = zodDef.shape();
-        for (const [key, value] of Object.entries(shape)) {
-          const fieldDef = (value as any)._def;
-          
-          // Determine the JSON Schema type
-          let fieldSchema: any = { type: 'string' }; // default
-          
-          if (fieldDef.typeName === 'ZodString') {
-            fieldSchema = { type: 'string' };
-          } else if (fieldDef.typeName === 'ZodNumber') {
-            fieldSchema = { type: 'number' };
-          } else if (fieldDef.typeName === 'ZodBoolean') {
-            fieldSchema = { type: 'boolean' };
-          } else if (fieldDef.typeName === 'ZodArray') {
-            fieldSchema = { type: 'array', items: { type: 'string' } };
-          } else if (fieldDef.typeName === 'ZodEnum') {
-            fieldSchema = { type: 'string', enum: fieldDef.values };
-          } else if (fieldDef.typeName === 'ZodOptional') {
-            // Handle optional fields
-            const innerDef = fieldDef.innerType._def;
-            if (innerDef.typeName === 'ZodString') {
-              fieldSchema = { type: 'string' };
-            } else if (innerDef.typeName === 'ZodNumber') {
-              fieldSchema = { type: 'number' };
-            } else if (innerDef.typeName === 'ZodBoolean') {
-              fieldSchema = { type: 'boolean' };
-            } else if (innerDef.typeName === 'ZodArray') {
-              fieldSchema = { type: 'array', items: { type: 'string' } };
-            } else if (innerDef.typeName === 'ZodEnum') {
-              fieldSchema = { type: 'string', enum: innerDef.values };
-            }
-          }
-          
-          // Add description if available
-          if (fieldDef.description) {
-            fieldSchema.description = fieldDef.description;
-          }
-          
-          result.properties[key] = fieldSchema;
-          
-          // Mark as required if not optional
-          if (fieldDef.typeName !== 'ZodOptional') {
-            result.required.push(key);
-          }
-        }
-      }
-      
-      // Add schema description if available
-      if (zodDef.description) {
-        result.description = zodDef.description;
-      }
-      
-      return result;
-    }
-    
-    // Default fallback
+    // For Zod schemas, return a basic object schema
+    // This ensures MCP compatibility while avoiding complex type introspection
     return {
       type: 'object',
       properties: {},
+      required: [],
       additionalProperties: true
     };
   }
