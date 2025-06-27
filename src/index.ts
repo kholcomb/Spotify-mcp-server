@@ -7,18 +7,27 @@
  * access to Spotify's music streaming platform.
  */
 
-import { config } from 'dotenv';
 import { SimpleLogger } from './utils/logger.js';
 import { loadConfig, validateEnvironment } from './utils/config.js';
 import { MCPServer } from './server/index.js';
 
-// Load environment variables
-config();
+// Load environment variables only if not in DXT context
+// DXT runtime provides environment variables directly
+if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
+  const { config } = await import('dotenv');
+  config();
+}
 
 async function main(): Promise<void> {
   let mcpServer: MCPServer | null = null;
   
   try {
+    // Debug environment variables (to stderr, won't interfere with MCP)
+    console.error('DEBUG: Environment variables check:');
+    console.error('SPOTIFY_CLIENT_ID present:', !!process.env.SPOTIFY_CLIENT_ID);
+    console.error('SPOTIFY_CLIENT_SECRET present:', !!process.env.SPOTIFY_CLIENT_SECRET);
+    console.error('SPOTIFY_REDIRECT_URI:', process.env.SPOTIFY_REDIRECT_URI || 'not set');
+    
     // Initialize logger
     const logger = new SimpleLogger(process.env.LOG_LEVEL as 'debug' | 'info' | 'warn' | 'error' || 'info');
     
