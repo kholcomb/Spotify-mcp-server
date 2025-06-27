@@ -10,6 +10,13 @@ import { RequestHandler } from './requestHandler.js';
 import { AuthService } from '../auth/index.js';
 import { SpotifyClient } from '../spotify/index.js';
 import type { ServerConfig } from '../types/index.js';
+import type { SecurityConfigManager } from '../security/securityConfig.js';
+import { createClientAuthenticator, type ClientAuthenticator } from '../security/clientAuthenticator.js';
+import { createEnhancedRateLimiter, type EnhancedRateLimiter } from '../security/enhancedRateLimiter.js';
+import { createInputSanitizer, type InputSanitizer } from '../security/inputSanitizer.js';
+import { createCertificateManager, type CertificateManager } from '../security/certificateManager.js';
+import { createScopeManager, type ScopeManager } from '../security/scopeManager.js';
+import { createSecurityEvent, type SecureLogger } from '../security/secureLogger.js';
 import {
   createPlaybackTools,
   createSearchTools,
@@ -32,9 +39,16 @@ export class MCPServer {
   private readonly logger: Logger;
   private readonly authService: AuthService;
   private readonly spotifyClient: SpotifyClient;
+  private readonly securityConfigManager?: SecurityConfigManager;
+  private readonly clientAuthenticator?: ClientAuthenticator;
+  private readonly rateLimiter?: EnhancedRateLimiter;
+  private readonly inputSanitizer?: InputSanitizer;
+  private readonly certificateManager?: CertificateManager;
+  private readonly scopeManager?: ScopeManager;
   
-  constructor(config: ServerConfig, logger: Logger) {
+  constructor(config: ServerConfig, logger: Logger, securityConfigManager?: SecurityConfigManager) {
     this.logger = logger;
+    this.securityConfigManager = securityConfigManager;
     
     // Initialize MCP server
     this.server = new Server(
@@ -52,14 +66,60 @@ export class MCPServer {
     // Initialize transport
     this.transport = new StdioServerTransport();
     
+    // Initialize security components if available
+    if (this.securityConfigManager) {
+      this.clientAuthenticator = createClientAuthenticator(
+        this.securityConfigManager.getClientAuthConfig(),
+        logger
+      );
+      
+      this.rateLimiter = createEnhancedRateLimiter(
+        this.securityConfigManager.getRateLimitingConfig(),
+        logger
+      );
+      
+      this.inputSanitizer = createInputSanitizer(
+        this.securityConfigManager.getInputSanitizationConfig(),
+        logger
+      );
+      
+      this.certificateManager = createCertificateManager(
+        this.securityConfigManager.getCertificatePinningConfig(),
+        logger
+      );
+      
+      this.scopeManager = createScopeManager(
+        this.securityConfigManager.getConfig().oauthScopes.tier,
+        logger
+      );
+      
+      logger.info('Security components initialized', {
+        clientAuth: !!this.clientAuthenticator,
+        rateLimiting: !!this.rateLimiter,
+        inputSanitization: !!this.inputSanitizer,
+        certificatePinning: !!this.certificateManager,
+        scopeManagement: !!this.scopeManager,
+      });
+    }
+    
     // Initialize services
     this.authService = new AuthService(config.spotify, logger);
-    this.spotifyClient = new SpotifyClient(this.authService, logger);
+    this.spotifyClient = new SpotifyClient(
+      this.authService, 
+      logger, 
+      this.certificateManager
+    );
     this.toolRegistry = new ToolRegistry(logger);
     this.requestHandler = new RequestHandler(
       this.toolRegistry,
       this.authService,
-      logger
+      logger,
+      {
+        clientAuthenticator: this.clientAuthenticator,
+        rateLimiter: this.rateLimiter,
+        inputSanitizer: this.inputSanitizer,
+        scopeManager: this.scopeManager,
+      }
     );
     
     // Set up request handlers
@@ -95,19 +155,87 @@ export class MCPServer {
     // Handle tool execution requests
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
+      const clientId = 'mcp-client'; // Default client ID for MCP requests
+      const userId = 'default-user'; // Default user ID - in production, extract from context
       
       this.logger.info('Handling tools/call request', {
         toolName: name,
-        hasArguments: !!args
+        hasArguments: !!args,
+        clientId,
+        userId,
       });
       
       try {
-        const result = await this.requestHandler.handleToolCall(name, args);
+        // Apply security checks if available
+        if (this.securityConfigManager) {
+          // Rate limiting check
+          if (this.rateLimiter) {
+            const rateLimitResult = await this.rateLimiter.checkRateLimit(userId, name, clientId);
+            if (!rateLimitResult.allowed) {
+              this.logger.warn('Rate limit exceeded', {
+                toolName: name,
+                userId,
+                reason: rateLimitResult.reason,
+              });
+              
+              // Log security event
+              if ('logSecurityEvent' in this.logger) {
+                (this.logger as SecureLogger).logSecurityEvent(createSecurityEvent(
+                  'rate_limit',
+                  'medium',
+                  'Rate limit exceeded for tool execution',
+                  { toolName: name, reason: rateLimitResult.reason },
+                  userId,
+                  clientId
+                ));
+              }
+              
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    success: false,
+                    error: {
+                      code: 'RATE_LIMITED',
+                      message: rateLimitResult.reason || 'Rate limit exceeded',
+                      retryAfter: rateLimitResult.retryAfter,
+                    },
+                  }, null, 2),
+                }],
+                isError: true,
+              };
+            }
+            
+            // Record the request
+            this.rateLimiter.recordRequest(userId, true, name, clientId);
+          }
+          
+          // Input sanitization
+          if (this.inputSanitizer && args) {
+            const sanitizedArgs = this.inputSanitizer.sanitizeInput(args);
+            if (sanitizedArgs !== args) {
+              this.logger.info('Input sanitized', {
+                toolName: name,
+                originalKeys: Object.keys((args as Record<string, unknown>) || {}),
+                sanitizedKeys: Object.keys(sanitizedArgs || {}),
+              });
+            }
+          }
+        }
+        
+        const result = await this.requestHandler.handleToolCall(name, args, { userId, clientId });
         
         this.logger.info('Tool execution successful', {
           toolName: name,
-          success: result.success
+          success: result.success,
+          userId,
+          clientId,
         });
+        
+        // Complete rate limit tracking
+        if (this.rateLimiter) {
+          this.rateLimiter.completeRequest();
+        }
         
         return {
           content: [
@@ -120,8 +248,31 @@ export class MCPServer {
       } catch (error) {
         this.logger.error('Tool execution failed', {
           toolName: name,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
+          userId,
+          clientId,
         });
+        
+        // Record failed request for rate limiting
+        if (this.rateLimiter) {
+          this.rateLimiter.recordRequest(userId, false, name, clientId);
+          this.rateLimiter.completeRequest();
+        }
+        
+        // Log security event for errors
+        if (this.securityConfigManager && 'logSecurityEvent' in this.logger) {
+          (this.logger as SecureLogger).logSecurityEvent(createSecurityEvent(
+            'error',
+            'low',
+            'Tool execution failed',
+            { 
+              toolName: name, 
+              error: error instanceof Error ? error.message : 'Unknown error',
+            },
+            userId,
+            clientId
+          ));
+        }
         
         return {
           content: [
@@ -231,6 +382,18 @@ export class MCPServer {
     this.logger.info('Starting MCP server');
     
     try {
+      // Initialize certificate pinning if available
+      if (this.certificateManager) {
+        try {
+          await this.certificateManager.initializeCertificatePins();
+          this.logger.info('Certificate pinning initialized');
+        } catch (error) {
+          this.logger.warn('Certificate pinning initialization failed', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+      
       // Register tools
       await this.registerTools();
       

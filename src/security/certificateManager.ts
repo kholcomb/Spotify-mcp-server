@@ -13,19 +13,20 @@ import type { Logger } from '../types/index.js';
 /**
  * Known Spotify API certificate fingerprints for pinning
  * These are SHA-256 fingerprints of Spotify's certificate chain
+ * 
+ * Note: These are placeholder values. In production, obtain actual
+ * certificate fingerprints using the extractCertificateFingerprint utility.
  */
 export const SPOTIFY_CERTIFICATE_PINS: Record<string, string[]> = {
   // Spotify API endpoints
   'api.spotify.com': [
-    // Primary certificate (example - in production, get actual fingerprints)
-    'sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
-    // Backup certificate
-    'sha256:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=',
+    // Note: Use extractCertificateFingerprint('api.spotify.com') to get real values
+    // These are examples and should be replaced with actual fingerprints
   ],
   // Spotify Accounts endpoints  
   'accounts.spotify.com': [
-    'sha256:CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=',
-    'sha256:DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD=',
+    // Note: Use extractCertificateFingerprint('accounts.spotify.com') to get real values
+    // These are examples and should be replaced with actual fingerprints
   ],
 };
 
@@ -184,6 +185,88 @@ export class CertificateManager {
       hostname,
       pinCount: pins.length,
     });
+  }
+
+  /**
+   * Initialize certificate pins by fetching current Spotify certificates
+   */
+  async initializeCertificatePins(): Promise<void> {
+    if (!this.config.enabled) {
+      this.logger.info('Certificate pinning disabled, skipping initialization');
+      return;
+    }
+
+    const hosts = ['api.spotify.com', 'accounts.spotify.com'];
+    
+    for (const host of hosts) {
+      try {
+        this.logger.info('Fetching certificate fingerprint', { host });
+        
+        const fingerprint = await extractCertificateFingerprint(host);
+        
+        // Update pins if we got a valid fingerprint
+        if (fingerprint) {
+          this.config.pins[host] = [fingerprint];
+          this.logger.info('Updated certificate pin', { host, fingerprint });
+        }
+      } catch (error) {
+        this.logger.warn('Failed to fetch certificate fingerprint', {
+          host,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        
+        // In strict mode, this is a hard failure
+        if (this.config.strictMode) {
+          throw new Error(`Failed to initialize certificate pins for ${host}`);
+        }
+      }
+    }
+
+    // Log final pin configuration
+    const pinCount = Object.values(this.config.pins).reduce((sum, pins) => sum + pins.length, 0);
+    this.logger.info('Certificate pin initialization complete', {
+      hosts: Object.keys(this.config.pins),
+      totalPins: pinCount,
+      strictMode: this.config.strictMode,
+    });
+  }
+
+  /**
+   * Validate all configured certificate pins
+   */
+  async validateAllPins(): Promise<{ valid: boolean; results: Array<{ host: string; valid: boolean; error?: string }> }> {
+    const results: Array<{ host: string; valid: boolean; error?: string }> = [];
+    let allValid = true;
+
+    for (const host of Object.keys(this.config.pins)) {
+      try {
+        const currentFingerprint = await extractCertificateFingerprint(host);
+        const configuredPins = this.config.pins[host] || [];
+        const isValid = configuredPins.includes(currentFingerprint);
+        
+        results.push({ host, valid: isValid });
+        
+        if (!isValid) {
+          allValid = false;
+          this.logger.warn('Certificate pin mismatch detected', {
+            host,
+            currentFingerprint,
+            configuredPins,
+          });
+        }
+      } catch (error) {
+        allValid = false;
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        results.push({ host, valid: false, error: errorMessage });
+        
+        this.logger.error('Certificate validation failed', {
+          host,
+          error: errorMessage,
+        });
+      }
+    }
+
+    return { valid: allValid, results };
   }
 
   /**

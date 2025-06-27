@@ -4,6 +4,10 @@ import type { ToolRegistry } from './toolRegistry.js';
 import type { AuthService } from '../auth/index.js';
 import type { SpotifyClient } from '../types/index.js';
 import { SpotifyClient as SpotifyClientImpl } from '../spotify/index.js';
+import type { ClientAuthenticator } from '../security/clientAuthenticator.js';
+import type { EnhancedRateLimiter } from '../security/enhancedRateLimiter.js';
+import type { InputSanitizer } from '../security/inputSanitizer.js';
+import type { ScopeManager } from '../security/scopeManager.js';
 
 /**
  * Request handler for MCP tool execution
@@ -16,24 +20,50 @@ export class RequestHandler {
   private readonly authService: AuthService;
   private readonly logger: Logger;
   private spotifyClient: SpotifyClient;
+  private readonly securityComponents?: {
+    clientAuthenticator?: ClientAuthenticator;
+    rateLimiter?: EnhancedRateLimiter;
+    inputSanitizer?: InputSanitizer;
+    scopeManager?: ScopeManager;
+  };
   
   constructor(
     toolRegistry: ToolRegistry,
     authService: AuthService,
-    logger: Logger
+    logger: Logger,
+    securityComponents?: {
+      clientAuthenticator?: ClientAuthenticator;
+      rateLimiter?: EnhancedRateLimiter;
+      inputSanitizer?: InputSanitizer;
+      scopeManager?: ScopeManager;
+    }
   ) {
     this.toolRegistry = toolRegistry;
     this.authService = authService;
     this.logger = logger;
+    this.securityComponents = securityComponents;
     
     // Initialize Spotify client
     this.spotifyClient = new SpotifyClientImpl(authService, logger);
+    
+    if (securityComponents) {
+      this.logger.info('Request handler initialized with security components', {
+        hasClientAuth: !!securityComponents.clientAuthenticator,
+        hasRateLimiter: !!securityComponents.rateLimiter,
+        hasInputSanitizer: !!securityComponents.inputSanitizer,
+        hasScopeManager: !!securityComponents.scopeManager,
+      });
+    }
   }
   
   /**
    * Handle tool call request
    */
-  async handleToolCall(toolName: string, args: unknown): Promise<ToolResult> {
+  async handleToolCall(
+    toolName: string, 
+    args: unknown, 
+    context?: { userId?: string; clientId?: string }
+  ): Promise<ToolResult> {
     const startTime = Date.now();
     
     try {
@@ -53,16 +83,43 @@ export class RequestHandler {
       // Create tool context (not used in current implementation but available for extensions)
       const _context = await this.createToolContext(toolName);
       
+      // Apply security input sanitization first
+      let processedInput = args;
+      if (this.securityComponents?.inputSanitizer && args) {
+        try {
+          processedInput = this.securityComponents.inputSanitizer.sanitizeInput(args);
+          if (processedInput !== args) {
+            this.logger.debug('Input sanitized during tool execution', {
+              toolName,
+              userId: context?.userId,
+            });
+          }
+        } catch (error) {
+          this.logger.error('Input sanitization failed', {
+            toolName,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+          return {
+            success: false,
+            error: {
+              code: 'INPUT_SANITIZATION_ERROR',
+              message: 'Input contains potentially unsafe content',
+            },
+          };
+        }
+      }
+      
       // Validate input if tool has Zod schema
-      let validatedInput = args;
+      let validatedInput = processedInput;
       if (tool.inputSchema && 'parse' in tool.inputSchema) {
         try {
-          validatedInput = (tool.inputSchema as z.ZodSchema).parse(args);
+          validatedInput = (tool.inputSchema as z.ZodSchema).parse(processedInput);
         } catch (error) {
           if (error instanceof z.ZodError) {
             this.logger.error('Input validation failed', {
               toolName,
-              errors: error.errors
+              errors: error.errors,
+              userId: context?.userId,
             });
             return {
               success: false,
@@ -77,10 +134,56 @@ export class RequestHandler {
         }
       }
       
+      // Check scope permissions if scope manager is available and user is authenticated
+      if (this.securityComponents?.scopeManager && context?.userId) {
+        try {
+          const authStatus = await this.authService.getAuthStatus();
+          if (authStatus.authenticated && authStatus.scopes) {
+            const scopeValidation = this.securityComponents.scopeManager.validateToolAccess(
+              toolName, 
+              authStatus.scopes.split(' ')
+            );
+            
+            if (!scopeValidation.allowed) {
+              this.logger.warn('Tool access denied due to insufficient scopes', {
+                toolName,
+                userId: context.userId,
+                missingScopes: scopeValidation.missingScopes,
+                reason: scopeValidation.reason,
+              });
+              
+              return {
+                success: false,
+                error: {
+                  code: 'INSUFFICIENT_SCOPES',
+                  message: scopeValidation.reason || 'Insufficient permissions for this tool',
+                  details: {
+                    missingScopes: scopeValidation.missingScopes,
+                  },
+                },
+              };
+            }
+            
+            // Log scope usage for auditing
+            this.securityComponents.scopeManager.logScopeUsage(
+              toolName, 
+              authStatus.scopes.split(' ')
+            );
+          }
+        } catch (error) {
+          this.logger.warn('Scope validation failed', {
+            toolName,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+      
       // Execute tool
       this.logger.info('Executing tool', {
         toolName,
-        hasInput: !!validatedInput
+        hasInput: !!validatedInput,
+        userId: context?.userId,
+        clientId: context?.clientId,
       });
       
       const result = await tool.execute(validatedInput);
