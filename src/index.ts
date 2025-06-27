@@ -7,7 +7,6 @@
  * access to Spotify's music streaming platform.
  */
 
-import { config } from 'dotenv';
 import { SimpleLogger } from './utils/logger.js';
 import { loadConfig, validateEnvironment } from './utils/config.js';
 import { MCPServer } from './server/index.js';
@@ -15,8 +14,23 @@ import { createSecurityConfigManager, getSecurityConfigFromEnv } from './securit
 import { createSecureLogger } from './security/secureLogger.js';
 import type { SecurityEnvironment } from './security/securityConfig.js';
 
-// Load environment variables
-config();
+// Load environment variables only if not in DXT context
+// DXT runtime provides environment variables directly
+// Check for DXT context by looking for DXT-specific environment or working directory patterns
+const isDXTContext = process.cwd().includes('Claude Extensions') || 
+                     process.argv[1]?.includes('Claude Extensions') ||
+                     process.env.DXT_RUNTIME === 'true' ||
+                     process.argv[0]?.includes('Claude');
+
+
+if (!isDXTContext) {
+  try {
+    const { config } = await import('dotenv');
+    config();
+  } catch (error) {
+    // Silently ignore dotenv import errors in DXT context
+  }
+}
 
 async function main(): Promise<void> {
   let mcpServer: MCPServer | null = null;
@@ -42,7 +56,6 @@ async function main(): Promise<void> {
 
     logger.info('Configuration loaded successfully', {
       logLevel: serverConfig.logLevel,
-      redirectUri: serverConfig.spotify.redirectUri,
     });
 
     // Initialize and start MCP server with security configuration
