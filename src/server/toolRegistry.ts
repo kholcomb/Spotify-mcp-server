@@ -79,6 +79,7 @@ export class ToolRegistry {
 
   /**
    * Convert Zod schema to JSON Schema format for MCP compatibility
+   * For now, we return a simple object schema since complex Zod parsing is error-prone
    */
   private convertToJsonSchema(schema: object): object {
     const schemaObj = schema as Record<string, unknown>;
@@ -88,6 +89,9 @@ export class ToolRegistry {
       return schema;
     }
     
+    // For Zod schemas, return a basic object schema
+    // This ensures MCP compatibility while avoiding complex type introspection
+
     // If it's a Zod schema, parse its shape
     if (schemaObj._def) {
       const zodDef = schemaObj._def as Record<string, unknown>;
@@ -158,6 +162,7 @@ export class ToolRegistry {
     return {
       type: 'object',
       properties: {},
+      required: [],
       additionalProperties: true
     };
   }
