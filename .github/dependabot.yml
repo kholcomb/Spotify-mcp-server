@@ -52,8 +52,6 @@ updates:
       security:
         patterns:
           - "*"
-        update-types:
-          - "security-update"
 
     # Version update strategy
     versioning-strategy: increase
